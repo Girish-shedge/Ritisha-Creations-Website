@@ -25,9 +25,12 @@ interface DriveFile {
 }
 
 export function driveThumbUrl(fileId: string, width: number) {
-  // Same-origin proxy — Drive thumbnail hotlinks break in production (403 / empty).
-  // width kept for API compatibility; proxy returns full file (browser caches).
-  void width
+  // Googleusercontent CDN — reliable for public Drive files in <img>.
+  // (drive.google.com/thumbnail and uc?export=view often 302/block hotlinks.)
+  return `https://lh3.googleusercontent.com/d/${fileId}=w${width}`
+}
+
+export function driveProxyUrl(fileId: string) {
   return `/api/media?id=${encodeURIComponent(fileId)}`
 }
 

@@ -450,10 +450,8 @@ function warmImage(src: string) {
 }
 
 function warmCategoryImages(category: CategoryData) {
-  for (const p of category.photos) {
-    warmImage(p.thumb)
-    warmImage(p.full)
-  }
+  // Thumbs only — fulls load on gallery open (avoid flooding the network on home).
+  for (const p of category.photos) warmImage(p.thumb)
 }
 
 function DriveImg({
@@ -466,13 +464,24 @@ function DriveImg({
   style?: React.CSSProperties
 }) {
   const candidates = useMemo(() => {
+    // Prefer CDN; keep same-origin proxy as last resort for stubborn files.
+    if (src.includes('lh3.googleusercontent.com/d/')) {
+      const id = src.match(/\/d\/([^/=]+)/)?.[1]
+      if (id) {
+        return [
+          src,
+          `https://lh3.googleusercontent.com/d/${id}=w1600`,
+          `/api/media?id=${encodeURIComponent(id)}`,
+        ]
+      }
+    }
     const m = /[?&]id=([^&]+)/.exec(src)
     const id = m?.[1] ? decodeURIComponent(m[1]) : null
     if (!id) return [src]
     return [
-      `/api/media?id=${encodeURIComponent(id)}`,
       `https://lh3.googleusercontent.com/d/${id}=w1200`,
-      `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}`,
+      `/api/media?id=${encodeURIComponent(id)}`,
+      src,
     ]
   }, [src])
 
