@@ -1,15 +1,25 @@
 import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
-import { readCatalogueCache, type CategoryData } from '@/data/categories'
+import {
+  categoryPath,
+  readCatalogueCache,
+  type CategoryData,
+  type CategoryPhoto,
+} from '@/data/categories'
 import { loadCatalogue } from '@/data/driveCatalogue'
+import { shareCategory } from '@/lib/share'
 import bgImg from '@/assets/bg.png'
+import iconBack from '@/assets/icons/chevron-left.svg'
+import iconShare from '@/assets/icons/share.svg'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
 
 // ── Design tokens ─────────────────────────────────────────────
 const FONT_BOLD = "'Season Mix-TRIAL:Bold', 'Poppins', sans-serif"
+const FONT_SEMI = "'Season Mix-TRIAL:SemiBold', 'Poppins', sans-serif"
 const FS_HEAD   = 36
 const FS_CHROME = 16
+const NAV_BTN = 40
 
 // ── SVG paths (from Figma Extension V2: 298:141676 / 298:141678) ──
 // Header: flat top, bump hangs down. Footer: flat bottom, bump points up.
@@ -37,7 +47,6 @@ const FOOTER_RIGHT =
   'M196.5 0 C226.793 56.2577 350.052 -19.9307 350.052 30.5399 V43.5358 C372.336 39.2626 393 56.3397 393 79.0298 V87.3859'
 
 const WAVE_AR = 393 / 87.3859
-const ICON_BTN = 44
 
 const WA_NUMBER = '918766630191'
 function waUrl(message: string) {
@@ -345,38 +354,61 @@ function GreenFooter({
   )
 }
 
-function IconBack() {
+function NavIconBtn({
+  label, onClick, src,
+}: {
+  label: string
+  onClick: () => void
+  src: string
+}) {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="flex items-center justify-center shrink-0 active:opacity-75"
+      style={{
+        width: NAV_BTN,
+        height: NAV_BTN,
+        borderRadius: 62,
+        background: 'linear-gradient(to top, #000 12.393%, #333)',
+      }}
+    >
+      <img src={src} alt="" width={24} height={24} className="block size-6" draggable={false} />
+    </button>
   )
 }
 
-function IconShare() {
+function DriveImg({
+  src, alt, priority, className, style,
+}: {
+  src: string
+  alt: string
+  priority?: boolean
+  className?: string
+  style?: React.CSSProperties
+}) {
+  const [loaded, setLoaded] = useState(false)
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M8 7l4-4 4 4" stroke="currentColor" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M5 14v4a2 2 0 002 2h10a2 2 0 002-2v-4" stroke="currentColor" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <>
+      {!loaded && <div className={`shimmer absolute inset-0 ${className || ''}`} aria-hidden />}
+      <img
+        src={src}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async"
+        className={className}
+        style={{
+          ...style,
+          opacity: loaded ? 1 : 0,
+          transition: 'opacity 280ms ease-in-out',
+        }}
+        draggable={false}
+        onLoad={() => setLoaded(true)}
+      />
+    </>
   )
-}
-
-async function shareCategory(title: string) {
-  const url = typeof window !== 'undefined' ? window.location.href : ''
-  try {
-    if (navigator.share) {
-      await navigator.share({ title, url })
-      return
-    }
-    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(`${title}\n${url}`)
-  } catch {
-    // user cancelled share sheet — ignore
-  }
 }
 
 // ── Card blur overlay ─────────────────────────────────────────
@@ -461,25 +493,27 @@ function ViewportButton({ onClick, children }: { onClick: () => void; children: 
 }
 
 // ── Card image scroller (infinite horizontal, ease-in-out) ────
-const DOT = 4
-const DOT_ACTIVE = DOT * 3
+const DOT_H = 4
+const DOT_W = 4
+const DOT_ACTIVE_W = DOT_W * 3
 
 function CardDots({ count, active }: { count: number; active: number }) {
   if (count <= 1) return null
   return (
-    <div className="flex items-center justify-center" style={{ gap: 6 }} aria-hidden>
+    <div className="flex items-center justify-center" style={{ gap: 6, height: DOT_H }} aria-hidden>
       {Array.from({ length: count }, (_, i) => {
         const on = i === active
-        const s = on ? DOT_ACTIVE : DOT
         return (
           <span
             key={i}
-            className="rounded-full bg-white"
+            className="bg-white block"
             style={{
-              width: s,
-              height: s,
-              opacity: on ? 1 : 0.7,
-              transition: 'width 400ms ease-in-out, height 400ms ease-in-out, opacity 400ms ease-in-out',
+              width: on ? DOT_ACTIVE_W : DOT_W,
+              height: DOT_H,
+              borderRadius: 999,
+              opacity: on ? 1 : 0.65,
+              transition:
+                'width 500ms ease-in-out, opacity 500ms ease-in-out',
             }}
           />
         )
@@ -491,7 +525,7 @@ function CardDots({ count, active }: { count: number; active: number }) {
 function CardImageScroller({
   photos, alt, onIndexChange,
 }: {
-  photos: string[]
+  photos: CategoryPhoto[]
   alt: string
   onIndexChange?: (i: number) => void
 }) {
@@ -524,6 +558,14 @@ function CardImageScroller({
     return () => cancelAnimationFrame(id)
   }, [anim, i])
 
+  // Preload next thumb while current shows
+  useEffect(() => {
+    if (n <= 1) return
+    const next = photos[(active + 1) % n]
+    const img = new Image()
+    img.src = next.thumb
+  }, [active, n, photos])
+
   return (
     <div className="absolute inset-0 overflow-hidden">
       <div
@@ -534,18 +576,14 @@ function CardImageScroller({
           willChange: 'transform',
         }}
       >
-        {track.map((src, idx) => (
+        {track.map((photo, idx) => (
           <div key={idx} className="relative h-full shrink-0 grow-0" style={{ flexBasis: '100%' }}>
-            <img
-              src={src}
+            <DriveImg
+              src={photo.thumb}
               alt={idx === 0 ? alt : ''}
-              aria-hidden={idx !== 0}
-              loading={idx === 0 ? 'eager' : 'lazy'}
-              fetchPriority={idx === 0 ? 'high' : 'auto'}
-              decoding="async"
+              priority={idx === 0}
               className="absolute inset-0 size-full object-cover object-center block"
               style={{ maxWidth: 'none' }}
-              draggable={false}
             />
           </div>
         ))}
@@ -702,15 +740,16 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
 }
 
 // ── Gallery photo tile ────────────────────────────────────────
-function GalleryPhoto({ src, alt, priority }: { src: string; alt: string; priority?: boolean }) {
+function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: string; priority?: boolean }) {
   return (
     <div className="relative w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
-      <img src={src} alt={alt}
-        loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'}
-        decoding="async"
+      <DriveImg
+        src={photo.full}
+        alt={alt}
+        priority={priority}
         className="absolute inset-0 size-full object-cover object-center block"
         style={{ maxWidth: 'none' }}
-        draggable={false} />
+      />
     </div>
   )
 }
@@ -720,6 +759,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const [footerH, setFooterH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
@@ -731,6 +771,32 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
+
+  useEffect(() => {
+    document.title = `${category.galleryTitle} · Ritisha Creations`
+    const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
+    const setMeta = (prop: string, content: string) => {
+      let el = document.querySelector(`meta[property="${prop}"]`) as HTMLMetaElement | null
+      if (!el) {
+        el = document.createElement('meta')
+        el.setAttribute('property', prop)
+        document.head.appendChild(el)
+      }
+      el.content = content
+    }
+    setMeta('og:title', category.galleryTitle)
+    setMeta('og:description', 'Hey, check out this amazing piece by Ritisha Creations')
+    setMeta('og:url', `${window.location.origin}${categoryPath(category.slug)}`)
+    if (cover) setMeta('og:image', cover.full)
+    return () => { document.title = 'Ritisha Creations' }
+  }, [category])
+
+  const onShare = useCallback(async () => {
+    if (sharing) return
+    setSharing(true)
+    try { await shareCategory(category) }
+    finally { setSharing(false) }
+  }, [category, sharing])
 
   return (
     <div className="relative size-full overflow-hidden">
@@ -749,54 +815,45 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
         style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >
+        {/* Figma 304:713 — sticky blur/gradient nav */}
         <div
-          className="sticky top-0 z-20 flex items-center"
+          className="sticky top-0 z-20 w-full"
           style={{
-            gap: 12,
-            padding: 12,
-            background: 'rgba(255,255,255,0.55)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            padding: 16,
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 93.738%)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           }}
         >
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label="Go back"
-            className="flex items-center justify-center shrink-0 active:opacity-60 text-[#232323]"
-            style={{ width: ICON_BTN, height: ICON_BTN, margin: -10 }}
-          >
-            <IconBack />
-          </button>
-          <h1
-            className="flex-1 min-w-0 m-0 text-center text-[#232323]"
-            style={{
-              fontFamily: FONT_BOLD,
-              fontWeight: 780,
-              fontSize: FS_CHROME,
-              lineHeight: 1.2,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {category.galleryTitle}
-          </h1>
-          <button
-            type="button"
-            onClick={() => shareCategory(category.galleryTitle)}
-            aria-label="Share"
-            className="flex items-center justify-center shrink-0 active:opacity-60 text-[#232323]"
-            style={{ width: ICON_BTN, height: ICON_BTN, margin: -10 }}
-          >
-            <IconShare />
-          </button>
+          <div className="flex items-center w-full" style={{ gap: 8 }}>
+            <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
+            <h1
+              className="flex-1 min-w-0 m-0 text-center text-black"
+              style={{
+                fontFamily: FONT_SEMI,
+                fontWeight: 670,
+                fontSize: FS_CHROME,
+                lineHeight: 'normal',
+                letterSpacing: '-0.16px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {category.galleryTitle}
+            </h1>
+            <NavIconBtn
+              label={sharing ? 'Sharing…' : 'Share'}
+              onClick={onShare}
+              src={iconShare}
+            />
+          </div>
         </div>
-        <div className="flex flex-col" style={{ gap: 16 }}>
-          {category.photos.map((src, i) => (
+        <div className="flex flex-col" style={{ gap: 0 }}>
+          {category.photos.map((photo, i) => (
             <GalleryPhoto
-              key={i}
-              src={src}
+              key={photo.id}
+              photo={photo}
               alt={`${category.galleryTitle} photo ${i + 1}`}
               priority={i === 0}
             />
@@ -805,6 +862,12 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
       </div>
     </div>
   )
+}
+
+function pathSlug() {
+  const raw = window.location.pathname.replace(/^\/+|\/+$/g, '')
+  if (!raw || raw.includes('.')) return null
+  return raw
 }
 
 // ── Root ──────────────────────────────────────────────────────
@@ -828,26 +891,64 @@ export default function App() {
       if (cancelled) return
       setCategories(next)
       setCatalogueReady(true)
+      const slug = pathSlug()
+      if (slug) {
+        const match = next.find((c) => c.slug === slug)
+        if (match) setSelected(match)
+      }
+      // Warm first thumbs for faster home cards
+      for (const c of next) {
+        const cover = c.photos.find((p) => p.id === c.coverId) ?? c.photos[0]
+        if (!cover) continue
+        const img = new Image()
+        img.src = cover.thumb
+      }
     })
     return () => { cancelled = true }
   }, [])
 
+  // Deep-link when cache already had categories before fetch finishes
+  useEffect(() => {
+    if (selected || !categories.length) return
+    const slug = pathSlug()
+    if (!slug) return
+    const match = categories.find((c) => c.slug === slug)
+    if (match) setSelected(match)
+  }, [categories, selected])
+
   const navigate = useCallback((cat: CategoryData | null) => {
     setVisible(false)
-    setTimeout(() => { setSelected(cat); setVisible(true) }, 280)
+    setTimeout(() => {
+      setSelected(cat)
+      const path = cat ? categoryPath(cat.slug) : '/'
+      window.history.pushState({}, '', path)
+      setVisible(true)
+    }, 280)
   }, [])
+
+  useEffect(() => {
+    const onPop = () => {
+      const slug = pathSlug()
+      if (!slug) {
+        setSelected(null)
+        return
+      }
+      const match = categories.find((c) => c.slug === slug)
+      setSelected(match ?? null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [categories])
 
   const ready = fontsReady && catalogueReady
 
   return (
     <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
       <div className="relative w-full max-w-[480px] h-[100dvh]">
-        {/* Skeleton until fonts + catalogue (cache or Drive) ready */}
         <div className="absolute inset-0 z-50 pointer-events-none"
           style={{ opacity: ready ? 0 : 1, transition: 'opacity 380ms ease-in-out' }}>
           <HomeSkeletonScreen />
         </div>
-        {/* Main content */}
         <div className="absolute inset-0"
           style={{
             opacity: ready ? (visible ? 1 : 0) : 0,

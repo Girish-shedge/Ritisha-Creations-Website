@@ -19,16 +19,17 @@ Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer 
 
 | Drive | App |
 |-------|-----|
-| Subfolder name | Category title + gallery title |
-| Image files in folder (A→Z) | Home card scroller + gallery tiles |
+| Subfolder name | Category title + slug (`/modak-pushp-backdrop`) |
+| Files named `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = share/OG cover |
 | Empty / non-image folders | Skipped |
 
 - Fetched on **every page load** via Google Drive API (`VITE_GOOGLE_DRIVE_API_KEY`).
-- Folder must stay **Anyone with the link can view**.
-- On API failure: show **last cached** catalogue from `localStorage` (`ritisha.driveCatalogue.v1`).
-- Code: `src/data/driveCatalogue.ts` + `src/data/categories.ts` (types/cache only).
+- Home uses **w640** thumbs; gallery uses **w1200**; shimmer placeholder until each image loads.
+- Parallel folder fetches; warm `Image 1` thumbs after catalogue load.
+- On API failure: last cached catalogue (`localStorage` `ritisha.driveCatalogue.v2`).
+- Share proxy: `/api/media?id=` (Vercel + Vite dev middleware).
 
-Env: copy `.env.example` → `.env.local`. On Vercel, set the same `VITE_*` vars and redeploy.
+Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA rewrite in `vercel.json`.
 
 ---
 
@@ -36,20 +37,19 @@ Env: copy `.env.example` → `.env.local`. On Vercel, set the same `VITE_*` vars
 
 ### Home
 - Sticky blue wave header — "Ritisha Creations" (stroke → fill → text intro once per load)
-- Category cards — **1:1** area with Figma **corner-cut frame** (Subtract mask) and **infinite horizontal auto-scroller** (ease-in-out, ~3.5s, no pause); pagination dots above the title (active dot **3×** size); title overlay (24px side padding)
+- Category cards — **1:1** corner-cut frame + infinite horizontal scroller; dots morph **4×4 → 12×4 pill** (ease-in-out, shrink/grow together)
 - **"View all photos" only** opens gallery (card image is not a tap target)
 - No green footer on Home
 - **40px** bottom padding after the last card
-- Scroll focus: card nearest viewport centre stays at **scale 1 / opacity 1**; others ease toward **scale 0.9 / opacity 0.75** (image + button together)
+- Scroll focus: centre card **scale 1 / opacity 1**; others → **0.9 / 0.75**
 
 ### Gallery
-- No blue ornate header
-- Sticky top bar (blur over photos): back icon · truncated title · share icon (**12px** gaps/padding)
-- Share uses Web Share API (`title` + site URL); clipboard fallback
-- Edge-to-edge **1:1** photos stacked vertically with **16px** gap
-- Sticky green footer — "DM us for more information" with stroke → fill → text intro **each time the gallery opens**
+- Sticky Figma nav (`304:713`): 40px black circular back/share, truncated SemiBold title, blur + top gradient
+- Share: Web Share with **all images when OS allows**, else **Image 1** + text `Hey, check out this amazing piece by Ritisha Creations` + category URL
+- Edge-to-edge **1:1** photos, **0 gap**, shimmer while loading
+- Sticky green footer — "DM us for more information" (intro each open)
 
-Navigation: 280ms fade + `translateY(10px)`. `selected: CategoryData | null` in `App`.
+Navigation: History API paths + 280ms fade. Back → `/`.
 
 ---
 

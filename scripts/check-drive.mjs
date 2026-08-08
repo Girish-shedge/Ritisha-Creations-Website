@@ -1,15 +1,10 @@
-/**
- * Smoke-check Drive catalogue. Reads .env.local.
- * Sends localhost Referer so website-restricted API keys work from CLI.
- * Usage: node scripts/check-drive.mjs
- */
 import fs from 'node:fs'
 
 const env = Object.fromEntries(
   fs
     .readFileSync('.env.local', 'utf8')
     .split(/\r?\n/)
-    .filter(Boolean)
+    .filter((l) => l && !l.startsWith('#') && l.includes('='))
     .map((l) => {
       const i = l.indexOf('=')
       return [l.slice(0, i), l.slice(i + 1)]
@@ -46,4 +41,5 @@ console.log('OK folders:', folders.map((f) => f.name).join(' | ') || '(none)')
 for (const f of folders) {
   const images = await list(f.id, "mimeType contains 'image/'")
   console.log(`  ${f.name}: ${images.length} images`)
+  for (const img of images) console.log(`    - ${img.name}`)
 }

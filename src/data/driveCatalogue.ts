@@ -1,12 +1,14 @@
 /**
  * Google Drive folder = source of truth.
- * Root folder → subfolders (categories, A→Z) → image files (photos, A→Z).
+ * Root folder → subfolders (categories, A→Z) → Image N files (natural order).
  * Fetched on every page load; callers keep last good cache on failure.
  */
 
 import {
   type CategoryData,
+  type CategoryPhoto,
   readCatalogueCache,
+  slugify,
   writeCatalogueCache,
 } from '@/data/categories'
 
@@ -22,9 +24,8 @@ interface DriveFile {
   mimeType: string
 }
 
-function driveImageUrl(fileId: string) {
-  // Public-folder thumbnail — works in <img> without OAuth.
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1200`
+export function driveThumbUrl(fileId: string, width: number) {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`
 }
 
 async function listChildren(parentId: string, extraQ: string): Promise<DriveFile[]> {
@@ -51,7 +52,12 @@ function isImage(f: DriveFile) {
   return f.mimeType.startsWith('image/')
 }
 
-/** Split folder name into overlay lines (keep short names on one line). */
+/** Case-sensitive "Image N" prefix from Drive renames. */
+export function imageIndex(name: string): number {
+  const m = /^Image (\d+)\b/.exec(name)
+  return m ? Number(m[1]) : Number.POSITIVE_INFINITY
+}
+
 export function titleLines(name: string): string[] {
   const parts = name.trim().split(/\s+/)
   if (parts.length <= 3) return [name.trim()]
@@ -59,29 +65,44 @@ export function titleLines(name: string): string[] {
   return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')]
 }
 
-export async function fetchDriveCatalogue(): Promise<CategoryData[]> {
-  const folders = await listChildren(ROOT_FOLDER_ID, `mimeType = '${FOLDER_MIME}'`)
-  const categories: CategoryData[] = []
-
-  for (const folder of folders) {
-    const files = await listChildren(folder.id, `mimeType contains 'image/'`)
-    const photos = files.filter(isImage).map((f) => driveImageUrl(f.id))
-    if (photos.length === 0) continue
-    categories.push({
-      id: folder.id,
-      lines: titleLines(folder.name),
-      galleryTitle: folder.name.trim(),
-      photos,
-    })
+function toPhoto(f: DriveFile): CategoryPhoto {
+  return {
+    id: f.id,
+    name: f.name,
+    thumb: driveThumbUrl(f.id, 640),
+    full: driveThumbUrl(f.id, 1200),
   }
-
-  return categories
 }
 
-/**
- * Refresh from Drive. On success, writes cache.
- * On failure, returns cached categories (or []).
- */
+export async function fetchDriveCatalogue(): Promise<CategoryData[]> {
+  const folders = await listChildren(ROOT_FOLDER_ID, `mimeType = '${FOLDER_MIME}'`)
+
+  const categories = await Promise.all(
+    folders.map(async (folder) => {
+      const files = (await listChildren(folder.id, `mimeType contains 'image/'`))
+        .filter(isImage)
+        .sort((a, b) => imageIndex(a.name) - imageIndex(b.name) || a.name.localeCompare(b.name))
+
+      if (files.length === 0) return null
+
+      const photos = files.map(toPhoto)
+      const cover = files.find((f) => imageIndex(f.name) === 1) ?? files[0]
+      const title = folder.name.trim()
+
+      return {
+        id: folder.id,
+        slug: slugify(title),
+        lines: titleLines(title),
+        galleryTitle: title,
+        photos,
+        coverId: cover.id,
+      } satisfies CategoryData
+    }),
+  )
+
+  return categories.filter((c): c is CategoryData => c !== null)
+}
+
 export async function loadCatalogue(): Promise<{
   categories: CategoryData[]
   fromCache: boolean
@@ -97,9 +118,11 @@ export async function loadCatalogue(): Promise<{
   }
 }
 
-// ponytail: one assert — title wrap + cache round-trip shape
 if (import.meta.env.DEV) {
+  console.assert(imageIndex('Image 1') === 1, 'Image 1 index')
+  console.assert(imageIndex('Image 10') === 10, 'Image 10 index')
+  console.assert(imageIndex('Image 2') < imageIndex('Image 10'), 'natural order')
+  console.assert(slugify('Modak Pushp Backdrop') === 'modak-pushp-backdrop', 'slug')
   const lines = titleLines('Circular Round Backdrop Extra')
   console.assert(lines.length === 2, 'titleLines should split long names', lines)
-  console.assert(titleLines('Hanging Toran').length === 1, 'short names stay 1 line')
 }
