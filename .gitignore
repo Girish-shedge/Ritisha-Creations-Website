@@ -14,5 +14,3 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
-
-.vercel
