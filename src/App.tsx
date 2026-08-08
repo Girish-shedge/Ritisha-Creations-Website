@@ -6,13 +6,16 @@ import {
   type CategoryPhoto,
 } from '@/data/categories'
 import { loadCatalogue } from '@/data/driveCatalogue'
-import { shareCategory } from '@/lib/share'
+import { prefetchCategoryShare, shareCategory } from '@/lib/share'
 import bgImg from '@/assets/bg.png'
+import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
+const CARD_ARM_MS = 1000
+const GALLERY_NAV_MS = 520
 
 // ── Design tokens ─────────────────────────────────────────────
 const FONT_BOLD = "'Season Mix-TRIAL:Bold', 'Poppins', sans-serif"
@@ -389,9 +392,21 @@ function DriveImg({
   style?: React.CSSProperties
 }) {
   const [loaded, setLoaded] = useState(false)
+  useEffect(() => { setLoaded(false) }, [src])
   return (
     <>
-      {!loaded && <div className={`shimmer absolute inset-0 ${className || ''}`} aria-hidden />}
+      <img
+        src={placeholderImg}
+        alt=""
+        aria-hidden
+        className={className}
+        style={{
+          ...style,
+          opacity: loaded ? 0 : 1,
+          transition: 'opacity 280ms ease-in-out',
+        }}
+        draggable={false}
+      />
       <img
         src={src}
         alt={alt}
@@ -463,6 +478,7 @@ function useScrollFocus(cardRef: React.RefObject<HTMLElement | null>, scrollerRe
     }
   }, [cardRef, scrollerRef])
   return {
+    focus,
     scale: 0.9 + 0.1 * focus,
     opacity: 0.75 + 0.25 * focus,
   }
@@ -495,25 +511,29 @@ function ViewportButton({ onClick, children }: { onClick: () => void; children: 
 // ── Card image scroller (infinite horizontal, ease-in-out) ────
 const DOT_H = 4
 const DOT_W = 4
-const DOT_ACTIVE_W = DOT_W * 3
+const DOT_ACTIVE_W = 12
 
 function CardDots({ count, active }: { count: number; active: number }) {
   if (count <= 1) return null
   return (
-    <div className="flex items-center justify-center" style={{ gap: 6, height: DOT_H }} aria-hidden>
+    <div
+      className="flex items-center justify-center"
+      style={{ gap: 6, height: DOT_H, minHeight: DOT_H }}
+      aria-hidden
+    >
       {Array.from({ length: count }, (_, i) => {
         const on = i === active
         return (
           <span
             key={i}
-            className="bg-white block"
+            className="bg-white block shrink-0"
             style={{
               width: on ? DOT_ACTIVE_W : DOT_W,
               height: DOT_H,
-              borderRadius: 999,
-              opacity: on ? 1 : 0.65,
-              transition:
-                'width 500ms ease-in-out, opacity 500ms ease-in-out',
+              borderRadius: 9999,
+              opacity: on ? 1 : 0.55,
+              transition: 'width 500ms ease-in-out, opacity 500ms ease-in-out',
+              willChange: 'width, opacity',
             }}
           />
         )
@@ -523,26 +543,38 @@ function CardDots({ count, active }: { count: number; active: number }) {
 }
 
 function CardImageScroller({
-  photos, alt, onIndexChange,
+  photos, alt, onIndexChange, autoplay,
 }: {
   photos: CategoryPhoto[]
   alt: string
   onIndexChange?: (i: number) => void
+  /** true after the card has stayed centred ≥1s */
+  autoplay: boolean
 }) {
   const n = photos.length
   const track = n > 1 ? [...photos, photos[0]] : photos
   const [i, setI] = useState(0)
   const [anim, setAnim] = useState(true)
+  const [drag, setDrag] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [manual, setManual] = useState(false)
+  const startX = useRef<number | null>(null)
   const active = i >= n ? 0 : i
+  const canAuto = autoplay && !manual && n > 1
 
   useEffect(() => {
     onIndexChange?.(active)
   }, [active, onIndexChange])
 
+  // Reset manual lock when card loses autoplay (scrolled away)
   useEffect(() => {
-    if (n <= 1) return
+    if (!autoplay) setManual(false)
+  }, [autoplay])
+
+  useEffect(() => {
+    if (!canAuto) return
     if (i < n) {
-      const t = window.setTimeout(() => setI(i + 1), SLIDE_MS)
+      const t = window.setTimeout(() => setI((x) => x + 1), SLIDE_MS)
       return () => clearTimeout(t)
     }
     const t = window.setTimeout(() => {
@@ -550,7 +582,7 @@ function CardImageScroller({
       setI(0)
     }, SLIDE_EASE_MS)
     return () => clearTimeout(t)
-  }, [i, n])
+  }, [i, n, canAuto])
 
   useEffect(() => {
     if (anim || i !== 0) return
@@ -558,7 +590,6 @@ function CardImageScroller({
     return () => cancelAnimationFrame(id)
   }, [anim, i])
 
-  // Preload next thumb while current shows
   useEffect(() => {
     if (n <= 1) return
     const next = photos[(active + 1) % n]
@@ -566,13 +597,55 @@ function CardImageScroller({
     img.src = next.thumb
   }, [active, n, photos])
 
+  const goBy = (dir: number) => {
+    if (n <= 1) return
+    setManual(true)
+    setAnim(true)
+    setI((cur) => {
+      const base = cur >= n ? 0 : cur
+      return (base + dir + n) % n
+    })
+  }
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (n <= 1) return
+    startX.current = e.clientX
+    setDragging(true)
+    setDrag(0)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (startX.current == null) return
+    setDrag(e.clientX - startX.current)
+  }
+  const onPointerUp = () => {
+    if (startX.current == null) return
+    const dx = drag
+    startX.current = null
+    setDragging(false)
+    setDrag(0)
+    if (Math.abs(dx) > 40) goBy(dx < 0 ? 1 : -1)
+  }
+
+  const width = typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) : 360
+  const pct = i * 100 - (drag / Math.max(width, 1)) * 100
+
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div
+      className="absolute inset-0 overflow-hidden"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ touchAction: 'pan-y' }}
+    >
       <div
         className="flex h-full"
         style={{
-          transform: `translateX(-${i * 100}%)`,
-          transition: anim ? `transform ${SLIDE_EASE_MS}ms ease-in-out` : 'none',
+          transform: `translateX(-${pct}%)`,
+          transition: dragging || !anim
+            ? 'none'
+            : `transform ${SLIDE_EASE_MS}ms ease-in-out`,
           willChange: 'transform',
         }}
       >
@@ -582,7 +655,7 @@ function CardImageScroller({
               src={photo.thumb}
               alt={idx === 0 ? alt : ''}
               priority={idx === 0}
-              className="absolute inset-0 size-full object-cover object-center block"
+              className="absolute inset-0 size-full object-cover object-center block pointer-events-none"
               style={{ maxWidth: 'none' }}
             />
           </div>
@@ -603,11 +676,22 @@ function CategoryCard({
   category, onViewAll, introVisible, introDelay, scrollerRef, scrollActive,
 }: CategoryCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const { scale, opacity } = useScrollFocus(cardRef, scrollerRef)
+  const { focus, scale, opacity } = useScrollFocus(cardRef, scrollerRef)
   const [slide, setSlide] = useState(0)
+  const [armed, setArmed] = useState(false)
   const onSlide = useCallback((i: number) => setSlide(i), [])
   const s = scrollActive ? scale : 1
   const o = !introVisible ? 0 : scrollActive ? opacity : 1
+
+  useEffect(() => {
+    const centred = scrollActive && focus >= 0.85
+    if (!centred) {
+      setArmed(false)
+      return
+    }
+    const t = window.setTimeout(() => setArmed(true), CARD_ARM_MS)
+    return () => clearTimeout(t)
+  }, [focus, scrollActive])
 
   return (
     <div
@@ -620,7 +704,7 @@ function CategoryCard({
           : `translateY(52px) scale(${s})`,
         transformOrigin: 'center center',
         transition: scrollActive
-          ? undefined
+          ? 'transform 120ms linear, opacity 120ms linear'
           : `opacity 550ms ease-out ${introDelay}ms, transform 550ms cubic-bezier(0.22,1,0.36,1) ${introDelay}ms`,
         willChange: 'transform, opacity',
       }}>
@@ -640,6 +724,7 @@ function CategoryCard({
           photos={category.photos}
           alt={category.galleryTitle}
           onIndexChange={onSlide}
+          autoplay={armed}
         />
         <CardBlurOverlay uid={category.id} />
         <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end z-10 pb-4 pointer-events-none"
@@ -754,12 +839,62 @@ function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: str
   )
 }
 
+function GalleryNavChrome({ children, visible }: { children: React.ReactNode; visible: boolean }) {
+  return (
+    <div className="sticky top-0 z-20 w-full overflow-hidden">
+      <div
+        className="relative"
+        style={{
+          padding: 16,
+          transform: visible ? 'translateY(0)' : 'translateY(-110%)',
+          opacity: visible ? 1 : 0,
+          transition: `transform ${GALLERY_NAV_MS}ms ease-in-out, opacity ${GALLERY_NAV_MS}ms ease-in-out`,
+        }}
+      >
+        {/* Progressive blur 4→0 + black gradient @ 25% overall */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
+          <div
+            className="absolute inset-0"
+            style={{
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              maskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              backdropFilter: 'blur(2px)',
+              WebkitBackdropFilter: 'blur(2px)',
+              maskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
+              WebkitMaskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(to bottom, #000 0%, transparent 100%)',
+              opacity: 0.25,
+            }}
+          />
+        </div>
+        <div className="relative flex items-center w-full" style={{ gap: 8 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Screen 2 ─────────────────────────────────────────────────
 function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
   const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
   const [sharing, setSharing] = useState(false)
+  const [navIn, setNavIn] = useState(false)
+  const [showPhotos, setShowPhotos] = useState(false)
   const [footerH, setFooterH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
@@ -771,6 +906,20 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
+
+  // Header slide-in + start loading images in parallel with footer intro
+  useEffect(() => {
+    prefetchCategoryShare(category)
+    for (const p of category.photos) {
+      const img = new Image()
+      img.src = p.full
+    }
+    const a = requestAnimationFrame(() => {
+      setNavIn(true)
+      setShowPhotos(true)
+    })
+    return () => cancelAnimationFrame(a)
+  }, [category])
 
   useEffect(() => {
     document.title = `${category.galleryTitle} · Ritisha Creations`
@@ -815,47 +964,43 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
         style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >
-        {/* Figma 304:713 — sticky blur/gradient nav */}
+        <GalleryNavChrome visible={navIn}>
+          <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
+          <h1
+            className="flex-1 min-w-0 m-0 text-center text-white"
+            style={{
+              fontFamily: FONT_SEMI,
+              fontWeight: 670,
+              fontSize: FS_CHROME,
+              lineHeight: 'normal',
+              letterSpacing: '-0.16px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {category.galleryTitle}
+          </h1>
+          <NavIconBtn
+            label={sharing ? 'Sharing…' : 'Share'}
+            onClick={onShare}
+            src={iconShare}
+          />
+        </GalleryNavChrome>
         <div
-          className="sticky top-0 z-20 w-full"
+          className="flex flex-col"
           style={{
-            padding: 16,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0) 93.738%)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
+            gap: 16,
+            opacity: showPhotos ? 1 : 0,
+            transition: 'opacity 480ms ease-in-out',
           }}
         >
-          <div className="flex items-center w-full" style={{ gap: 8 }}>
-            <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
-            <h1
-              className="flex-1 min-w-0 m-0 text-center text-black"
-              style={{
-                fontFamily: FONT_SEMI,
-                fontWeight: 670,
-                fontSize: FS_CHROME,
-                lineHeight: 'normal',
-                letterSpacing: '-0.16px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {category.galleryTitle}
-            </h1>
-            <NavIconBtn
-              label={sharing ? 'Sharing…' : 'Share'}
-              onClick={onShare}
-              src={iconShare}
-            />
-          </div>
-        </div>
-        <div className="flex flex-col" style={{ gap: 0 }}>
           {category.photos.map((photo, i) => (
             <GalleryPhoto
               key={photo.id}
               photo={photo}
               alt={`${category.galleryTitle} photo ${i + 1}`}
-              priority={i === 0}
+              priority={i < 2}
             />
           ))}
         </div>
@@ -896,8 +1041,9 @@ export default function App() {
         const match = next.find((c) => c.slug === slug)
         if (match) setSelected(match)
       }
-      // Warm first thumbs for faster home cards
+      // Warm first thumbs + share cover files
       for (const c of next) {
+        prefetchCategoryShare(c)
         const cover = c.photos.find((p) => p.id === c.coverId) ?? c.photos[0]
         if (!cover) continue
         const img = new Image()

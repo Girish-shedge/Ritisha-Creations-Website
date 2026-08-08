@@ -37,17 +37,18 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 
 ### Home
 - Sticky blue wave header — "Ritisha Creations" (stroke → fill → text intro once per load)
-- Category cards — **1:1** corner-cut frame + infinite horizontal scroller; dots morph **4×4 → 12×4 pill** (ease-in-out, shrink/grow together)
+- Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card centred **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together
 - **"View all photos" only** opens gallery (card image is not a tap target)
 - No green footer on Home
 - **40px** bottom padding after the last card
 - Scroll focus: centre card **scale 1 / opacity 1**; others → **0.9 / 0.75**
 
 ### Gallery
-- Sticky Figma nav (`304:713`): 40px black circular back/share, truncated SemiBold title, blur + top gradient
-- Share: Web Share with **all images when OS allows**, else **Image 1** + text `Hey, check out this amazing piece by Ritisha Creations` + category URL
-- Edge-to-edge **1:1** photos, **0 gap**, shimmer while loading
-- Sticky green footer — "DM us for more information" (intro each open)
+- Sticky Figma nav: slides in from top (ease-in-out); black gradient @25% + progressive blur 4→0; circular back/share; white truncated title
+- Share: `Hey, check out this amazing piece by *Ritisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
+- Edge-to-edge **1:1** photos, **16px** gap (0 top/bottom padding on the stack), placeholder art while Drive loads
+- Footer intro starts with nav; images begin loading in parallel
+- Sticky green footer — "DM us for more information"
 
 Navigation: History API paths + 280ms fade. Back → `/`.
 
