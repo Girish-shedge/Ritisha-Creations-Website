@@ -3,8 +3,10 @@ dist/
 build/
 .cache/
 .env*
+!.env.example
 .vercel
 .vite/
+.cursor/
 vite.config.*.timestamp-*
 *.tsbuildinfo
 *-debug.log*
@@ -12,3 +14,5 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
+
+.vercel

@@ -1,30 +1,24 @@
 # Ritisha Creations Website
 
-Mobile-first decoration showcase for Ritisha Creations. Browse categories, view photo galleries, and enquire via WhatsApp.
+Mobile decoration showcase. Browse categories, open galleries, enquire on WhatsApp.
+
+**Live:** https://ritishacreations.vercel.app  
+**Repo:** https://github.com/Girish-shedge/Ritisha-Creations-Website
 
 ## Stack
 
-- React 19 + Vite 8 + TypeScript
-- Tailwind CSS v4
+React 19 · Vite 8 · Tailwind CSS v4 · TypeScript
 
 ## Develop
 
 ```bash
 pnpm install
 pnpm dev
-```
-
-## Build
-
-```bash
 pnpm build
-pnpm preview
 ```
 
 ## Content
 
-Edit categories and photos in `src/data/categories.ts`.
+Google Drive folder is the source of truth (fetched on each page load). Copy `.env.example` → `.env.local` and set `VITE_GOOGLE_DRIVE_API_KEY`. On Vercel, add the same env vars.
 
-## Live
-
-https://ritishacreations.vercel.app
+See `Project.md` for behaviour and design notes.
