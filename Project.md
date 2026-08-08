@@ -56,9 +56,12 @@ Navigation: History API paths + 280ms fade. Back → `/`.
 
 ## Intro
 
-### Home header (once per page load)
+### Shloka boot (first home load)
+Two Devanagari lines (Figma `309:764`) stroke-draw in light grey `#B9B9B9`: line 1 then line 2, ease-in-out. Progress tracks Drive catalogue + cover image loads (min ~2.2s). Fades out → home header intro. Skipped on category deep links.
+
+### Home header (once per page load after shloka)
 Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  
-`introPhase`: `trace` → `cards` → `done`. Does not replay on Gallery → Home.
+`introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay on Gallery → Home.
 
 ### Gallery footer (each category open)
 Same stroke → fill → text chain on "DM us for more information".
