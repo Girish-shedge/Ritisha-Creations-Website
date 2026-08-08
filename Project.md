@@ -1,4 +1,4 @@
-# Ritisha Creations — Decoration Showcase
+# Rittisha Creations — Decoration Showcase
 
 Mobile-first decoration showcase (max-width 480px). React 19 + Vite 8 + Tailwind CSS v4. Live: https://ritishacreations.vercel.app
 
@@ -15,7 +15,7 @@ Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer 
 
 ## Content source (Google Drive)
 
-**Root folder:** [Ritisha Creations Drive](https://drive.google.com/drive/folders/1blEF1JY8k4fGg66R_O1ZcSyN6wFHz9W8) (`VITE_DRIVE_FOLDER_ID`)
+**Root folder:** [Rittisha Creations Drive](https://drive.google.com/drive/folders/1blEF1JY8k4fGg66R_O1ZcSyN6wFHz9W8) (`VITE_DRIVE_FOLDER_ID`)
 
 | Drive | App |
 |-------|-----|
@@ -36,7 +36,7 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 ## Screens
 
 ### Home
-- Sticky blue wave header — "Ritisha Creations" (stroke → fill → text intro once per load)
+- Sticky blue wave header — "Rittisha Creations" (stroke → fill → text intro once per load)
 - Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together
 - **"View all photos"** fixed full-width button opens gallery (card image is not a tap target)
 - Simple vertical list (no scroll scale/opacity)
@@ -46,7 +46,7 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 
 ### Gallery
 - Overlay Figma nav: slides in from top (ease-in-out); black gradient @25% + progressive blur 4→0; circular back/share; white truncated title
-- Share: `Hey, check out this amazing piece by *Ritisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
+- Share: `Hey, check out this amazing piece by *Rittisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
 - Edge-to-edge **1:1** photos, **16px** gap (flush under overlay nav + footer); session image cache skips placeholders on revisit
 - Footer chrome intro (stroke → fill → text) each open; images warm in parallel
 - Sticky green footer — "DM us for more information"

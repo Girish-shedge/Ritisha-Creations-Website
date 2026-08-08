@@ -12,6 +12,22 @@ const AUDIO_SRC = '/audio/shankh.mp3'
 
 type Phase = 'draw' | 'pulse' | 'fade'
 
+// Module singleton — survives React Strict Mode remount (which would otherwise pause audio).
+let sharedShankh: HTMLAudioElement | null = null
+
+function getShankhAudio() {
+  if (!sharedShankh) {
+    const a = new Audio(AUDIO_SRC)
+    a.preload = 'auto'
+    a.volume = AUDIO_VOL
+    a.setAttribute('playsinline', 'true')
+    // iOS Safari
+    ;(a as HTMLAudioElement & { playsInline?: boolean }).playsInline = true
+    sharedShankh = a
+  }
+  return sharedShankh
+}
+
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
@@ -105,26 +121,45 @@ export default function ShlokaIntro({
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [phase, setPhase] = useState<Phase>('draw')
   const [overlayOpacity, setOverlayOpacity] = useState(1)
+  const [needsTap, setNeedsTap] = useState(false)
   const doneRef = useRef(false)
   const readyRef = useRef(ready)
   readyRef.current = ready
 
-  // Play cropped shankh under the 4s draw (file already faded in/out; volume 75%)
+  // Start shankh: try autoplay; if blocked, unlock on first tap (common on mobile).
   useEffect(() => {
-    const audio = new Audio(AUDIO_SRC)
-    audio.preload = 'auto'
+    const audio = getShankhAudio()
     audio.volume = AUDIO_VOL
+    try { audio.currentTime = 0 } catch { /* ignore */ }
     audioRef.current = audio
-    const play = audio.play()
-    if (play && typeof play.catch === 'function') {
-      // Autoplay may be blocked until gesture — silent fail, animation still runs.
-      play.catch(() => {})
+
+    let unlocked = false
+    const tryPlay = () => {
+      const p = audio.play()
+      if (p && typeof p.then === 'function') {
+        p.then(() => {
+          unlocked = true
+          setNeedsTap(false)
+        }).catch(() => {
+          if (!unlocked) setNeedsTap(true)
+        })
+      }
     }
+
+    tryPlay()
+
+    const unlock = () => {
+      tryPlay()
+    }
+    window.addEventListener('pointerdown', unlock, { passive: true })
+    window.addEventListener('touchstart', unlock, { passive: true })
+    window.addEventListener('keydown', unlock)
+
     return () => {
-      audio.pause()
-      audio.removeAttribute('src')
-      audio.load()
-      audioRef.current = null
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+      // Do not pause here — Strict Mode remount would kill the sound mid-intro.
     }
   }, [])
 
@@ -168,7 +203,7 @@ export default function ShlokaIntro({
       const t0 = performance.now()
       const fade = (now: number) => {
         const t = Math.min(1, (now - t0) / FADE_MS)
-        a.volume = startVol * (1 - t)
+        a.volume = Math.max(0, startVol * (1 - t))
         if (t < 1) requestAnimationFrame(fade)
         else a.pause()
       }
@@ -185,6 +220,12 @@ export default function ShlokaIntro({
     }
   }, [phase, onDone])
 
+  const onOverlayPointer = () => {
+    const a = audioRef.current ?? getShankhAudio()
+    a.volume = AUDIO_VOL
+    a.play().then(() => setNeedsTap(false)).catch(() => {})
+  }
+
   return (
     <div
       className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white px-4"
@@ -195,7 +236,10 @@ export default function ShlokaIntro({
       }}
       role="status"
       aria-label="Loading"
+      onPointerDown={onOverlayPointer}
     >
+      {/* Hidden element helps some mobile browsers unlock playback */}
+      <audio src={AUDIO_SRC} preload="auto" playsInline style={{ display: 'none' }} />
       <style>{`
         @keyframes shloka-pulse {
           0%, 100% { opacity: 1; }
@@ -213,6 +257,14 @@ export default function ShlokaIntro({
         <ShlokaLine raw={line1Svg} glyphsRef={line1Ref} width={353.268} height={37.055} />
         <ShlokaLine raw={line2Svg} glyphsRef={line2Ref} width={345.129} height={38.285} />
       </div>
+      {needsTap && phase !== 'fade' && (
+        <p
+          className="absolute bottom-10 left-0 right-0 m-0 text-center text-[#FC9C02]"
+          style={{ fontSize: 14, opacity: 0.85 }}
+        >
+          Tap to enable sound
+        </p>
+      )}
     </div>
   )
 }

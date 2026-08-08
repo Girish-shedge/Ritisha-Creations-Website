@@ -1,4 +1,4 @@
-# Ritisha Creations Website
+# Rittisha Creations Website
 
 Mobile decoration showcase. Browse categories, open galleries, enquire on WhatsApp.
 

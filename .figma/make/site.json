@@ -1,0 +1,11 @@
+{
+  "title": "Rittisha Creations",
+  "description": "Explore a curated gallery of decorative items with easy access to WhatsApp for inquiries, designed for seamless browsing on all mobile devices.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}

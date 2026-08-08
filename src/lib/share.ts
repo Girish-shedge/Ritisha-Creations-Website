@@ -2,7 +2,7 @@ import type { CategoryData } from '@/data/categories'
 import { categoryUrl } from '@/data/categories'
 
 /** WhatsApp uses *text* for bold. */
-const SHARE_TEXT = 'Hey, check out this amazing piece by *Ritisha Creations*'
+const SHARE_TEXT = 'Hey, check out this amazing piece by *Rittisha Creations*'
 
 function extFor(mime: string) {
   if (mime.includes('png')) return 'png'

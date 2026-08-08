@@ -1,5 +1,5 @@
 /**
- * Ritisha Creations — category shape + localStorage cache.
+ * Rittisha Creations — category shape + localStorage cache.
  * Live content comes from Google Drive (see driveCatalogue.ts).
  */
 

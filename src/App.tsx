@@ -907,7 +907,7 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
 
       <div ref={headerRef} className="absolute top-0 left-0 right-0 z-30" style={{ aspectRatio: `${WAVE_AR}` }}>
         <BlueHeader
-          label="Ritisha Creations"
+          label="Rittisha Creations"
           scrolled={scrolled}
           playIntro={introPhase === 'trace'}
           onIntroComplete={onHeaderIntroComplete}
@@ -1057,7 +1057,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   }, [category])
 
   useEffect(() => {
-    document.title = `${category.galleryTitle} · Ritisha Creations`
+    document.title = `${category.galleryTitle} · Rittisha Creations`
     const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
     const setMeta = (prop: string, content: string) => {
       let el = document.querySelector(`meta[property="${prop}"]`) as HTMLMetaElement | null
@@ -1069,10 +1069,10 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
       el.content = content
     }
     setMeta('og:title', category.galleryTitle)
-    setMeta('og:description', 'Hey, check out this amazing piece by Ritisha Creations')
+    setMeta('og:description', 'Hey, check out this amazing piece by Rittisha Creations')
     setMeta('og:url', `${window.location.origin}${categoryPath(category.slug)}`)
     if (cover) setMeta('og:image', cover.full)
-    return () => { document.title = 'Ritisha Creations' }
+    return () => { document.title = 'Rittisha Creations' }
   }, [category])
 
   const onShare = useCallback(async () => {
