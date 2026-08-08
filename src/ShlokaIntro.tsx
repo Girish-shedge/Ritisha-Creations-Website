@@ -6,7 +6,7 @@ const FILL = '#FC9C02'
 const LINE_MS = 2000
 const DRAW_MS = LINE_MS * 2
 const FADE_MS = 520
-const PULSE_MS = 700
+const PULSE_MS = 2200
 
 type Phase = 'draw' | 'pulse' | 'fade'
 

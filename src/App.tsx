@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId } from 'react'
 import {
   categoryPath,
   readCatalogueCache,
@@ -83,7 +83,7 @@ function BgImage() {
   return (
     <img src={bgImg} alt="" aria-hidden
       loading="eager" fetchPriority="high" decoding="async"
-      className="pointer-events-none absolute inset-0 size-full object-cover opacity-85"
+      className="pointer-events-none absolute inset-0 size-full object-cover opacity-75"
     />
   )
 }
@@ -141,55 +141,66 @@ function strokeDrawProps(opts: {
 type ChromeStep = 'stroke' | 'fill' | 'text' | 'done'
 function useChromeIntro(play: boolean, onComplete?: () => void) {
   const [step, setStep] = useState<ChromeStep>(() => (play ? 'stroke' : 'done'))
-  const [traceGo, setTraceGo] = useState(() => !play)
+  const [traceGo, setTraceGo] = useState(false)
   const strokeDone = useRef(false)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
-  // Footer starts with play=false, then flips true — reset and run the sequence.
+  // play false→true (or mount with play): run sequence from stroke.
+  // play true→false after finish: keep final 'done' paint.
   useEffect(() => {
-    if (!play) return
+    if (!play) {
+      setTraceGo(false)
+      return
+    }
     strokeDone.current = false
     setTraceGo(false)
     setStep('stroke')
   }, [play])
 
   useEffect(() => {
-    if (step !== 'stroke') return
+    if (!play || step !== 'stroke') return
     strokeDone.current = false
-    const id = requestAnimationFrame(() => setTraceGo(true))
-    return () => cancelAnimationFrame(id)
-  }, [step])
+    // Double rAF so dashoffset=1 paints before animating to 0
+    let id2 = 0
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => setTraceGo(true))
+    })
+    return () => {
+      cancelAnimationFrame(id1)
+      cancelAnimationFrame(id2)
+    }
+  }, [play, step])
 
   // Fallback if transitionend doesn't fire (hidden/offscreen edge cases).
   useEffect(() => {
-    if (step !== 'stroke' || !traceGo) return
+    if (!play || step !== 'stroke' || !traceGo) return
     const t = window.setTimeout(() => {
       if (strokeDone.current) return
       strokeDone.current = true
       setStep('fill')
     }, T_TRACE_DUR + 80)
     return () => clearTimeout(t)
-  }, [step, traceGo])
+  }, [play, step, traceGo])
 
   useEffect(() => {
-    if (step !== 'fill') return
+    if (!play || step !== 'fill') return
     const t = window.setTimeout(() => setStep('text'), T_FILL_DUR)
     return () => clearTimeout(t)
-  }, [step])
+  }, [play, step])
 
   useEffect(() => {
-    if (step !== 'text') return
+    if (!play || step !== 'text') return
     const t = window.setTimeout(() => {
       setStep('done')
       onCompleteRef.current?.()
     }, T_TEXT_DUR)
     return () => clearTimeout(t)
-  }, [step])
+  }, [play, step])
 
   const onStrokeTransitionEnd = (e: React.TransitionEvent<SVGPathElement>) => {
     if (e.propertyName !== 'stroke-dashoffset') return
-    if (strokeDone.current || step !== 'stroke') return
+    if (!play || strokeDone.current || step !== 'stroke') return
     strokeDone.current = true
     setStep('fill')
   }
@@ -273,6 +284,7 @@ function GreenFooter({
   onIntroComplete?: () => void
   visible?: boolean
 }) {
+  const uid = useId().replace(/:/g, '')
   const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
     useChromeIntro(playIntro, onIntroComplete)
 
@@ -290,8 +302,8 @@ function GreenFooter({
       <div className="relative w-full" style={{ aspectRatio: `${WAVE_AR}` }}>
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-          {settled && <WaveBlur clipId="greenF_wblur" path={FOOTER} active={scrolled} />}
-          <path d={FOOTER} fill="url(#greenFGrad)"
+          {settled && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
+          <path d={FOOTER} fill={`url(#${uid}_grad)`}
             style={{
               fillOpacity: showFill ? (settled && scrolled ? 0.75 : 1) : 0,
               transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
@@ -299,7 +311,7 @@ function GreenFooter({
           <path d={FOOTER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
           <path d={FOOTER_RIGHT} {...stroke} />
           <defs>
-            <linearGradient id="greenFGrad" x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
+            <linearGradient id={`${uid}_grad`} x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
               <stop stopColor="#6CEB3E" /><stop offset="1" stopColor="#4CED77" />
             </linearGradient>
           </defs>
@@ -345,6 +357,24 @@ function NavIconBtn({
   )
 }
 
+// Session image cache — skip placeholders for URLs already loaded this page life.
+const imgReady = new Set<string>()
+
+function warmImage(src: string) {
+  if (!src || imgReady.has(src)) return
+  const img = new Image()
+  img.onload = () => { imgReady.add(src) }
+  img.onerror = () => { imgReady.add(src) }
+  img.src = src
+}
+
+function warmCategoryImages(category: CategoryData) {
+  for (const p of category.photos) {
+    warmImage(p.thumb)
+    warmImage(p.full)
+  }
+}
+
 function DriveImg({
   src, alt, priority, className, style,
 }: {
@@ -354,8 +384,31 @@ function DriveImg({
   className?: string
   style?: React.CSSProperties
 }) {
-  const [loaded, setLoaded] = useState(false)
-  useEffect(() => { setLoaded(false) }, [src])
+  const [loaded, setLoaded] = useState(() => imgReady.has(src))
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  useEffect(() => {
+    if (imgReady.has(src)) {
+      setLoaded(true)
+      return
+    }
+    setLoaded(false)
+  }, [src])
+
+  useEffect(() => {
+    const el = imgRef.current
+    if (!el) return
+    if (el.complete && el.naturalWidth > 0) {
+      imgReady.add(src)
+      setLoaded(true)
+    }
+  }, [src])
+
+  const mark = () => {
+    imgReady.add(src)
+    setLoaded(true)
+  }
+
   return (
     <>
       <img
@@ -371,6 +424,7 @@ function DriveImg({
         draggable={false}
       />
       <img
+        ref={imgRef}
         src={src}
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
@@ -383,7 +437,7 @@ function DriveImg({
           transition: 'opacity 280ms ease-in-out',
         }}
         draggable={false}
-        onLoad={() => setLoaded(true)}
+        onLoad={mark}
       />
     </>
   )
@@ -411,61 +465,19 @@ function CardBlurOverlay({ uid }: { uid: string }) {
   )
 }
 
-// ── Home list scroll focus (centre = 100%, edges → 90% / 75%) ─
-function useScrollFocus(cardRef: React.RefObject<HTMLElement | null>, scrollerRef: React.RefObject<HTMLElement | null>) {
-  const [focus, setFocus] = useState(1)
-  useEffect(() => {
-    const card = cardRef.current
-    const root = scrollerRef.current
-    if (!card || !root) return
-    let raf = 0
-    const update = () => {
-      raf = 0
-      const cr = card.getBoundingClientRect()
-      const rr = root.getBoundingClientRect()
-      const mid = rr.top + rr.height / 2
-      const cardMid = cr.top + cr.height / 2
-      const dist = Math.abs(cardMid - mid)
-      const range = Math.max(rr.height * 0.55, 1)
-      setFocus(Math.max(0, Math.min(1, 1 - dist / range)))
-    }
-    const onScroll = () => {
-      if (raf) return
-      raf = requestAnimationFrame(update)
-    }
-    root.addEventListener('scroll', onScroll, { passive: true })
-    update()
-    return () => {
-      root.removeEventListener('scroll', onScroll)
-      if (raf) cancelAnimationFrame(raf)
-    }
-  }, [cardRef, scrollerRef])
-  return {
-    focus,
-    scale: 0.9 + 0.1 * focus,
-    opacity: 0.75 + 0.25 * focus,
-  }
-}
-
-// ── Viewport-grow button ──────────────────────────────────────
-function ViewportButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  const ref = useRef<HTMLButtonElement>(null)
-  const [wide, setWide] = useState(false)
-  useEffect(() => {
-    const el = ref.current; if (!el) return
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setWide(true) }, { threshold: 0.6 })
-    obs.observe(el); return () => obs.disconnect()
-  }, [])
+// ── View-all button (fixed full width) ────────────────────────
+function ViewAllButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button ref={ref} onClick={onClick}
-      className="flex items-center justify-center overflow-hidden active:opacity-75"
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-center active:opacity-75"
       style={{
         paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
         borderRadius: 62,
         background: 'linear-gradient(to top, #000 12.393%, #333)',
-        width: wide ? '100%' : '90%',
-        transition: 'width 600ms cubic-bezier(0.4, 0, 0.2, 1)',
-      }}>
+      }}
+    >
       {children}
     </button>
   )
@@ -639,37 +651,46 @@ function CategoryCard({
   category, onViewAll, introVisible, introDelay, scrollerRef, scrollActive,
 }: CategoryCardProps) {
   const cardRef = useRef<HTMLDivElement>(null)
-  const { focus, scale, opacity } = useScrollFocus(cardRef, scrollerRef)
   const [slide, setSlide] = useState(0)
   const [armed, setArmed] = useState(false)
   const onSlide = useCallback((i: number) => setSlide(i), [])
-  const s = scrollActive ? scale : 1
-  const o = !introVisible ? 0 : scrollActive ? opacity : 1
 
+  // Autoplay after the card has been mostly in view for 1s
   useEffect(() => {
-    const centred = scrollActive && focus >= 0.85
-    if (!centred) {
+    if (!scrollActive) {
       setArmed(false)
       return
     }
-    const t = window.setTimeout(() => setArmed(true), CARD_ARM_MS)
-    return () => clearTimeout(t)
-  }, [focus, scrollActive])
+    const card = cardRef.current
+    const root = scrollerRef.current
+    if (!card || !root) return
+    let timer = 0
+    const obs = new IntersectionObserver(
+      ([e]) => {
+        window.clearTimeout(timer)
+        if (e.isIntersecting && e.intersectionRatio >= 0.55) {
+          timer = window.setTimeout(() => setArmed(true), CARD_ARM_MS)
+        } else {
+          setArmed(false)
+        }
+      },
+      { root, threshold: [0, 0.55, 0.75, 1] },
+    )
+    obs.observe(card)
+    return () => {
+      obs.disconnect()
+      window.clearTimeout(timer)
+    }
+  }, [scrollActive, scrollerRef])
 
   return (
     <div
       ref={cardRef}
       className="flex flex-col gap-4 items-center w-full"
       style={{
-        opacity: o,
-        transform: introVisible
-          ? `translateY(0) scale(${s})`
-          : `translateY(52px) scale(${s})`,
-        transformOrigin: 'center center',
-        transition: scrollActive
-          ? 'transform 120ms linear, opacity 120ms linear'
-          : `opacity 550ms ease-out ${introDelay}ms, transform 550ms cubic-bezier(0.22,1,0.36,1) ${introDelay}ms`,
-        willChange: 'transform, opacity',
+        opacity: introVisible ? 1 : 0,
+        transform: introVisible ? 'translateY(0)' : 'translateY(52px)',
+        transition: `opacity 550ms ease-out ${introDelay}ms, transform 550ms cubic-bezier(0.22,1,0.36,1) ${introDelay}ms`,
       }}>
       <div
         className="relative w-full overflow-hidden"
@@ -701,11 +722,11 @@ function CategoryCard({
           </div>
         </div>
       </div>
-      <ViewportButton onClick={onViewAll}>
+      <ViewAllButton onClick={onViewAll}>
         <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}>
           View all photos
         </span>
-      </ViewportButton>
+      </ViewAllButton>
     </div>
   )
 }
@@ -764,7 +785,6 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
         className="absolute inset-0 overflow-y-auto scroll-smooth"
         style={{
           paddingTop: headerH + 16,
-          paddingBottom: 40,
           overflowY: scrollable ? 'auto' : 'hidden',
         }}
         onScroll={(e) => scrollable && setScrolled(e.currentTarget.scrollTop > 8)}
@@ -781,6 +801,20 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
               scrollActive={scrollable}
             />
           ))}
+          <p
+            className="m-0 w-full text-center"
+            style={{
+              fontFamily: FONT_BOLD,
+              fontWeight: 780,
+              fontSize: FS_CHROME,
+              lineHeight: 1.4,
+              color: '#1a1a1a',
+              paddingTop: 40,
+              paddingBottom: 40,
+            }}
+          >
+            handcrafted and made with love ❤️
+          </p>
         </div>
       </div>
     </div>
@@ -804,9 +838,9 @@ function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: str
 
 function GalleryNavChrome({ children, visible }: { children: React.ReactNode; visible: boolean }) {
   return (
-    <div className="sticky top-0 z-20 w-full overflow-hidden">
+    <div className="absolute top-0 left-0 right-0 z-20 w-full overflow-hidden pointer-events-none">
       <div
-        className="relative"
+        className="relative pointer-events-auto"
         style={{
           padding: 16,
           transform: visible ? 'translateY(0)' : 'translateY(-110%)',
@@ -852,36 +886,39 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
 
 // ── Screen 2 ─────────────────────────────────────────────────
 function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
-  const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
-  const [footerH, setFooterH] = useState(() =>
-    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
+  const [playFooter, setPlayFooter] = useState(false)
 
-  useLayoutEffect(() => {
-    const measure = () => {
-      if (footerRef.current) setFooterH(footerRef.current.offsetHeight)
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [])
-
-  // Header slide-in + start loading images in parallel with footer intro
+  // Nav + footer intro after paint; warm gallery images into session cache
   useEffect(() => {
+    setScrolled(false)
+    setFooterReady(false)
+    setNavIn(false)
+    setShowPhotos(false)
+    setPlayFooter(false)
+
     prefetchCategoryShare(category)
-    for (const p of category.photos) {
-      const img = new Image()
-      img.src = p.full
-    }
-    const a = requestAnimationFrame(() => {
-      setNavIn(true)
-      setShowPhotos(true)
+    warmCategoryImages(category)
+
+    let cancelled = false
+    let id2 = 0
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => {
+        if (cancelled) return
+        setNavIn(true)
+        setShowPhotos(true)
+        setPlayFooter(true)
+      })
     })
-    return () => cancelAnimationFrame(a)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(id1)
+      cancelAnimationFrame(id2)
+    }
   }, [category])
 
   useEffect(() => {
@@ -913,43 +950,45 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
-      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-30">
-        <GreenFooter
-          label="DM us for more information"
-          scrolled={footerReady ? scrolled : false}
-          href={waUrl(waCategoryMsg(category.galleryTitle))}
-          playIntro
-          onIntroComplete={() => setFooterReady(true)}
-        />
+      <div className="absolute bottom-0 left-0 right-0 z-30">
+        {playFooter && (
+          <GreenFooter
+            key={category.id}
+            label="DM us for more information"
+            scrolled={footerReady ? scrolled : false}
+            href={waUrl(waCategoryMsg(category.galleryTitle))}
+            playIntro
+            onIntroComplete={() => setFooterReady(true)}
+          />
+        )}
       </div>
+      <GalleryNavChrome visible={navIn}>
+        <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
+        <h1
+          className="flex-1 min-w-0 m-0 text-center text-white"
+          style={{
+            fontFamily: FONT_SEMI,
+            fontWeight: 670,
+            fontSize: FS_CHROME,
+            lineHeight: 'normal',
+            letterSpacing: '-0.16px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {category.galleryTitle}
+        </h1>
+        <NavIconBtn
+          label={sharing ? 'Sharing…' : 'Share'}
+          onClick={onShare}
+          src={iconShare}
+        />
+      </GalleryNavChrome>
       <div
         className="absolute inset-0 overflow-y-auto"
-        style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >
-        <GalleryNavChrome visible={navIn}>
-          <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
-          <h1
-            className="flex-1 min-w-0 m-0 text-center text-white"
-            style={{
-              fontFamily: FONT_SEMI,
-              fontWeight: 670,
-              fontSize: FS_CHROME,
-              lineHeight: 'normal',
-              letterSpacing: '-0.16px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {category.galleryTitle}
-          </h1>
-          <NavIconBtn
-            label={sharing ? 'Sharing…' : 'Share'}
-            onClick={onShare}
-            src={iconShare}
-          />
-        </GalleryNavChrome>
         <div
           className="flex flex-col"
           style={{
@@ -1009,13 +1048,10 @@ export default function App() {
         if (match) setSelected(match)
       }
 
-      // Warm covers in the background; don't block shloka/home on them
+      // Warm all thumbs + fulls for this session (DriveImg skips placeholders once ready)
       for (const c of next) {
         prefetchCategoryShare(c)
-        const cover = c.photos.find((p) => p.id === c.coverId) ?? c.photos[0]
-        if (!cover) continue
-        const img = new Image()
-        img.src = cover.thumb
+        warmCategoryImages(c)
       }
     })()
 
@@ -1074,21 +1110,24 @@ export default function App() {
         {showShloka && (
           <ShlokaIntro ready={fontsReady && catalogueReady} onDone={onShlokaDone} />
         )}
-        <div className="absolute inset-0"
-          style={{
-            opacity: contentReady ? (visible ? 1 : 0) : 0,
-            transform: visible ? 'translateY(0)' : 'translateY(10px)',
-            transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
-          }}>
-          {selected
-            ? <GalleryScreen category={selected} onBack={() => navigate(null)} />
-            : <HomeScreen
-                categories={categories}
-                onViewAll={(cat) => navigate(cat)}
-                introPhase={introPhase}
-                setIntroPhase={setIntroPhase}
-              />}
-        </div>
+        {/* Mount home only after shloka so BlueHeader intro starts from stroke, not a finished frame */}
+        {contentReady && (
+          <div className="absolute inset-0"
+            style={{
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0)' : 'translateY(10px)',
+              transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
+            }}>
+            {selected
+              ? <GalleryScreen category={selected} onBack={() => navigate(null)} />
+              : <HomeScreen
+                  categories={categories}
+                  onViewAll={(cat) => navigate(cat)}
+                  introPhase={introPhase}
+                  setIntroPhase={setIntroPhase}
+                />}
+          </div>
+        )}
       </div>
     </div>
   )

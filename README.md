@@ -21,4 +21,4 @@ pnpm build
 
 Google Drive folder is the source of truth (fetched on each page load). Copy `.env.example` → `.env.local` and set `VITE_GOOGLE_DRIVE_API_KEY`. On Vercel, add the same env vars.
 
-See `Project.md` for behaviour and design notes.
+See `Project.md` for behaviour and design notes (shloka boot, home/gallery chrome, Drive catalogue, share).

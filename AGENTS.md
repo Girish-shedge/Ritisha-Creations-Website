@@ -5,11 +5,14 @@ React + Vite + Tailwind CSS v4. Hosted on Vercel.
 ## Structure
 
 - `src/App.tsx` — UI (home + gallery)
+- `src/ShlokaIntro.tsx` — boot shloka loader
 - `src/data/driveCatalogue.ts` — Google Drive fetch (source of truth)
 - `src/data/categories.ts` — types + localStorage cache
-- `src/assets/` — site chrome images (`bg.png`)
+- `src/lib/share.ts` — Web Share + `/api/media` helper
+- `src/assets/` — `bg.png`, `placeholder.png`, `intro/`, icons
 - `src/index.css` — Tailwind + Season Mix Trial font faces
 - `public/fonts/` — Season Mix Trial woff2 files
+- `api/media.js` — Drive file proxy for share
 - `Project.md` — product/behaviour source of truth
 - `.env.example` — `VITE_GOOGLE_DRIVE_API_KEY`, `VITE_DRIVE_FOLDER_ID`
 
