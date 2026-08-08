@@ -7,6 +7,7 @@ import {
 } from '@/data/categories'
 import { loadCatalogue } from '@/data/driveCatalogue'
 import { prefetchCategoryShare, shareCategory } from '@/lib/share'
+import ShlokaIntro from '@/ShlokaIntro'
 import bgImg from '@/assets/bg.png'
 import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
@@ -63,7 +64,7 @@ function waCategoryMsg(name: string) {
 // Header intro once per app load (lives in App). Gallery footer intro plays
 // each time a category screen mounts.
 
-type IntroPhase = 'trace' | 'cards' | 'done'
+type IntroPhase = 'wait' | 'trace' | 'cards' | 'done'
 
 const T_TRACE_DUR = 1100
 const T_FILL_DUR  = 500
@@ -75,44 +76,6 @@ function useFontsReady() {
   const [ready, setReady] = useState(false)
   useEffect(() => { document.fonts.ready.then(() => setReady(true)) }, [])
   return ready
-}
-
-// ── Skeleton ──────────────────────────────────────────────────
-function SkeletonWave({ variant }: { variant: 'blue' | 'green' }) {
-  const cls = variant === 'blue' ? 'shimmer-blue' : 'shimmer-green'
-  const id  = `sk_${variant}`
-  const path = variant === 'blue' ? HEADER : FOOTER
-  return (
-    <div className={`relative w-full flex-shrink-0 overflow-hidden ${cls}`} style={{ aspectRatio: `${WAVE_AR}` }}>
-      <svg className="absolute inset-0 size-full" viewBox="0 0 393 87.3859" preserveAspectRatio="none">
-        <defs>
-          <mask id={id}>
-            <rect width="393" height="87.3859" fill="white" />
-            <path d={path} fill="black" />
-          </mask>
-        </defs>
-        <rect width="393" height="87.3859" fill="white" mask={`url(#${id})`} />
-      </svg>
-    </div>
-  )
-}
-function SkeletonCard() {
-  return (
-    <div className="w-full flex flex-col gap-4">
-      <div className="shimmer w-full" style={{ aspectRatio: '1/1', borderRadius: 4 }} />
-      <div className="shimmer w-full" style={{ height: 48, borderRadius: 62 }} />
-    </div>
-  )
-}
-function HomeSkeletonScreen() {
-  return (
-    <div className="absolute inset-0 flex flex-col bg-white z-50">
-      <SkeletonWave variant="blue" />
-      <div className="flex-1 flex flex-col gap-10 px-4 py-4 overflow-hidden">
-        <SkeletonCard /><SkeletonCard />
-      </div>
-    </div>
-  )
 }
 
 // ── Background ────────────────────────────────────────────────
@@ -1023,33 +986,67 @@ export default function App() {
   const [categories, setCategories] = useState<CategoryData[]>(
     () => readCatalogueCache() ?? [],
   )
-  const [catalogueReady, setCatalogueReady] = useState(
-    () => (readCatalogueCache()?.length ?? 0) > 0,
+  const [catalogueReady, setCatalogueReady] = useState(false)
+  const [loadProgress, setLoadProgress] = useState(0)
+  const [bootDone, setBootDone] = useState(() => Boolean(pathSlug()))
+  // introPhase waits until shloka finishes (unless deep-link skips boot)
+  const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
+    pathSlug() ? 'trace' : 'wait',
   )
-
-  // introPhase lives here so navigating to Gallery and back doesn't replay it.
-  const [introPhase, setIntroPhase] = useState<IntroPhase>('trace')
 
   useEffect(() => {
     let cancelled = false
-    loadCatalogue().then(({ categories: next }) => {
+    const deep = Boolean(pathSlug())
+
+    ;(async () => {
+      setLoadProgress(0.05)
+      const { categories: next } = await loadCatalogue()
       if (cancelled) return
       setCategories(next)
       setCatalogueReady(true)
+      setLoadProgress(0.35)
+
       const slug = pathSlug()
       if (slug) {
         const match = next.find((c) => c.slug === slug)
         if (match) setSelected(match)
       }
-      // Warm first thumbs + share cover files
-      for (const c of next) {
-        prefetchCategoryShare(c)
-        const cover = c.photos.find((p) => p.id === c.coverId) ?? c.photos[0]
-        if (!cover) continue
-        const img = new Image()
-        img.src = cover.thumb
+
+      const covers = next
+        .map((c) => ({ cat: c, cover: c.photos.find((p) => p.id === c.coverId) ?? c.photos[0] }))
+        .filter((x): x is { cat: CategoryData; cover: CategoryPhoto } => Boolean(x.cover))
+
+      if (covers.length === 0) {
+        setLoadProgress(1)
+        return
       }
-    })
+
+      let done = 0
+      await Promise.all(
+        covers.map(
+          ({ cat, cover }) =>
+            new Promise<void>((resolve) => {
+              prefetchCategoryShare(cat)
+              const img = new Image()
+              const mark = () => {
+                done += 1
+                if (!cancelled) setLoadProgress(0.35 + 0.65 * (done / covers.length))
+                resolve()
+              }
+              img.onload = mark
+              img.onerror = mark
+              img.src = cover.thumb
+            }),
+        ),
+      )
+      if (!cancelled) setLoadProgress(1)
+    })()
+
+    if (deep) {
+      // Deep link: no shloka; still wait for fonts + catalogue before showing UI
+      setBootDone(true)
+    }
+
     return () => { cancelled = true }
   }, [])
 
@@ -1061,6 +1058,11 @@ export default function App() {
     const match = categories.find((c) => c.slug === slug)
     if (match) setSelected(match)
   }, [categories, selected])
+
+  const onShlokaDone = useCallback(() => {
+    setBootDone(true)
+    setIntroPhase('trace')
+  }, [])
 
   const navigate = useCallback((cat: CategoryData | null) => {
     setVisible(false)
@@ -1086,18 +1088,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [categories])
 
-  const ready = fontsReady && catalogueReady
+  const contentReady = fontsReady && catalogueReady && (bootDone || Boolean(pathSlug()))
+  const showShloka = !pathSlug() && !bootDone
 
   return (
     <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
       <div className="relative w-full max-w-[480px] h-[100dvh]">
-        <div className="absolute inset-0 z-50 pointer-events-none"
-          style={{ opacity: ready ? 0 : 1, transition: 'opacity 380ms ease-in-out' }}>
-          <HomeSkeletonScreen />
-        </div>
+        {showShloka && (
+          <ShlokaIntro loadProgress={fontsReady ? loadProgress : Math.min(loadProgress, 0.2)} onDone={onShlokaDone} />
+        )}
         <div className="absolute inset-0"
           style={{
-            opacity: ready ? (visible ? 1 : 0) : 0,
+            opacity: contentReady ? (visible ? 1 : 0) : 0,
             transform: visible ? 'translateY(0)' : 'translateY(10px)',
             transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
           }}>
