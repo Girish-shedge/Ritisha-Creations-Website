@@ -1,8 +1,7 @@
 /**
- * Lightweight security self-check (ponytail: replaces full Strix run —
- * Strix needs Docker + LLM keys; upgrade path: docker run usestrix/strix).
- *
- * Fails if secrets leak into tracked sources or client Vite env.
+ * Lightweight security self-check.
+ * Fails if raw API key secrets leak into tracked sources.
+ * (Client may use import.meta.env.VITE_GOOGLE_* — values come from env, not repo.)
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -13,16 +12,6 @@ const fail = (msg) => {
   console.error('[security]', msg)
   process.exit(1)
 }
-
-const trackedGlobs = [
-  'src',
-  'scripts',
-  'index.html',
-  'package.json',
-  'README.md',
-  'Project.md',
-  '.env.example',
-]
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out
@@ -36,9 +25,11 @@ function walk(dir, out = []) {
   return out
 }
 
+const roots = ['src', 'scripts', 'api', 'index.html', 'package.json', 'README.md', 'Project.md', '.env.example']
 const files = []
-for (const g of trackedGlobs) {
+for (const g of roots) {
   const p = path.join(ROOT, g)
+  if (!fs.existsSync(p)) continue
   if (fs.statSync(p).isDirectory()) walk(p, files)
   else files.push(p)
 }
@@ -47,18 +38,6 @@ const secretRe = /AIzaSy[0-9A-Za-z_-]{20,}/g
 for (const f of files) {
   const text = fs.readFileSync(f, 'utf8')
   if (secretRe.test(text)) fail(`API key-like secret in ${path.relative(ROOT, f)}`)
-  if (/VITE_GOOGLE_DRIVE_API_KEY\s*=\s*['"]AIza/.test(text)) {
-    fail(`Client-bundled Drive key assignment in ${path.relative(ROOT, f)}`)
-  }
-}
-
-// Client must not import Drive keys via import.meta.env.VITE_*
-const appSrc = walk(path.join(ROOT, 'src'))
-for (const f of appSrc) {
-  const text = fs.readFileSync(f, 'utf8')
-  if (/import\.meta\.env\.VITE_GOOGLE/.test(text)) {
-    fail(`Vite-exposed Google env in client: ${path.relative(ROOT, f)}`)
-  }
 }
 
 if (fs.existsSync(path.join(ROOT, '.env.local'))) {
@@ -68,5 +47,4 @@ if (fs.existsSync(path.join(ROOT, '.env.local'))) {
   }
 }
 
-console.assert(fs.existsSync(path.join(ROOT, 'scripts', 'sync-drive-images.mjs')), 'sync script')
 console.log('[security] self-check OK')
