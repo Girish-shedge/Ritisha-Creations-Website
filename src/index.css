@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+@theme {
+  --duration-280: 280ms;
+  --duration-400: 400ms;
+}
+
+@font-face {
+  font-family: 'Season Mix-TRIAL:Bold';
+  font-style: normal;
+  font-weight: 780;
+  font-display: swap;
+  src: url('/fonts/Season_Mix-TRIAL-Bold.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Season Mix-TRIAL:SemiBold';
+  font-style: normal;
+  font-weight: 670;
+  font-display: swap;
+  src: url('/fonts/Season_Mix-TRIAL-SemiBold.woff2') format('woff2');
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -800px 0; }
+  100% { background-position:  800px 0; }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #e2e2e2 25%,
+    #efefef 50%,
+    #e2e2e2 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.shimmer-blue {
+  background: linear-gradient(
+    90deg,
+    #005f8a 25%,
+    #0077aa 50%,
+    #005f8a 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
+
+.shimmer-green {
+  background: linear-gradient(
+    90deg,
+    #4bb82e 25%,
+    #62d63a 50%,
+    #4bb82e 75%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s infinite linear;
+}
