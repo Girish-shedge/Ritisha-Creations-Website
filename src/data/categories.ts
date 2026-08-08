@@ -1,63 +1,37 @@
 /**
- * Ritisha Creations — category shape + localStorage cache.
- * Live content comes from Google Drive (see driveCatalogue.ts).
+ * Category catalogue — images come from Google Drive at build time.
+ *
+ * Source of truth: Drive folder (one subfolder per category).
+ * Run:  npm run sync:images
+ * Build: npm run build  (syncs automatically first)
+ *
+ * Generated files (do not edit by hand):
+ *   - src/data/categories.generated.ts
+ *   - public/gallery/<slug>/<driveFileId>.webp
  */
 
-export interface CategoryPhoto {
-  id: string
-  name: string
-  /** Smaller URL for home card scroller */
-  thumb: string
-  /** Larger URL for gallery */
-  full: string
-}
-
 export interface CategoryData {
+  /** Unique slug — used as React key and DOM ID. No spaces. */
   id: string
-  slug: string
+
+  /**
+   * Card title split into display lines.
+   * Each string becomes one <p> inside the card overlay.
+   * Split long titles so they read well on mobile (≤ 18 chars per line).
+   */
   lines: string[]
+
+  /** Image shown as the category card thumbnail on the Home screen. */
+  cardImage: string
+
+  /** Heading shown at the top of the Gallery screen. */
   galleryTitle: string
-  photos: CategoryPhoto[]
-  /** Drive file id for "Image 1" (share / OG cover) */
-  coverId: string
+
+  /**
+   * Gallery photos in display order.
+   * First photo loads eagerly (above the fold); the rest load lazily.
+   */
+  photos: string[]
 }
 
-const CACHE_KEY = 'ritisha.driveCatalogue.v2'
-
-export function readCatalogueCache(): CategoryData[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as CategoryData[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return null
-    if (!parsed[0]?.slug || !parsed[0]?.photos?.[0]?.thumb) return null
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-export function writeCatalogueCache(categories: CategoryData[]) {
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(categories))
-  } catch {
-    // ponytail: quota / private mode — skip cache write
-  }
-}
-
-export function slugify(name: string) {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-export function categoryPath(slug: string) {
-  return `/${slug}`
-}
-
-export function categoryUrl(slug: string) {
-  if (typeof window === 'undefined') return `https://ritishacreations.vercel.app/${slug}`
-  return `${window.location.origin}/${slug}`
-}
+export { CATEGORIES } from './categories.generated'

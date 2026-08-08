@@ -1,75 +1,53 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId } from 'react'
-import {
-  categoryPath,
-  readCatalogueCache,
-  type CategoryData,
-  type CategoryPhoto,
-} from '@/data/categories'
-import { loadCatalogue } from '@/data/driveCatalogue'
-import { prefetchCategoryShare, shareCategory } from '@/lib/share'
-import ShlokaIntro from '@/ShlokaIntro'
-import bgImg from '@/assets/bg.png'
-import placeholderImg from '@/assets/placeholder.png'
-import iconBack from '@/assets/icons/chevron-left.svg'
-import iconShare from '@/assets/icons/share.svg'
-
-const SLIDE_MS = 3500
-const SLIDE_EASE_MS = 700
-const CARD_ARM_MS = 1000
-const GALLERY_NAV_MS = 520
+import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
+import { CATEGORIES, type CategoryData } from '@/data/categories'
+import bgImg from '@/imports/Screen1/68143c346ca972cc10d7f55aff2dd8ffb41326d2.png'
 
 // ── Design tokens ─────────────────────────────────────────────
 const FONT_BOLD = "'Season Mix-TRIAL:Bold', 'Poppins', sans-serif"
-const FONT_SEMI = "'Season Mix-TRIAL:SemiBold', 'Poppins', sans-serif"
 const FS_HEAD   = 36
 const FS_CHROME = 16
-const NAV_BTN = 40
 
-// ── SVG paths (from Figma Extension V2: 298:141676 / 298:141678) ──
-// Header: flat top, bump hangs down. Footer: flat bottom, bump points up.
-const HEADER =
-  'M0 8.35612L0 0L393 0L393 8.35616C393 31.0462 372.336 48.1238 350.052 43.8501L350.052 56.846C350.052 107.23 226.655 31.3836 196.5 87.3859C166.207 31.1282 42.9478 107.317 42.9478 56.846L42.9478 43.8501C20.6641 48.1233 0 31.0461 0 8.35612Z'
-const FOOTER =
+// ── SVG paths ─────────────────────────────────────────────────
+const WAVE =
   'M393 79.0298V87.3859H0V79.0944V79.0298C0 56.3397 20.6641 39.2621 42.9478 43.5358V30.5399C42.9478 -19.844 166.345 56.0023 196.5 0C226.793 56.2577 350.052 -19.9307 350.052 30.5399V43.5358C372.336 39.2626 393 56.3397 393 79.0298Z'
 const CARD_OVERLAY =
   'M361 97.5C348.574 97.5 338.5 107.574 338.5 120H22.5C22.5 107.574 12.4264 97.5 0 97.5V0H361V97.5Z'
-// Figma Subtract 281:132809 — 361² rect minus ~45px corner ellipses
-const CARD_FRAME =
-  'M338.508 0C338.508 12.228 348.265 22.177 360.419 22.485L361 22.492V338.508C348.578 338.508 338.508 348.578 338.508 361H22.492C22.492 348.578 12.422 338.508 0 338.508V22.492C12.228 22.492 22.176 12.735 22.484 0.581L22.492 0H338.508Z'
-const CARD_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 361 361"><path fill="white" d="${CARD_FRAME}"/></svg>`,
-)}")`
+const ORNATE =
+  'M178.198 0.000976373H392.994C392.994 108.154 392.995 132.996 392.995 211.423C337.495 162.869 395.657 95.1307 336.745 79.9103C331.365 78.5204 327.122 74.3611 325.799 68.9661C317.068 33.3782 281.797 38.0609 258.924 38.061C229.508 38.061 216.386 20.5907 195.856 0.418864C175.377 20.5412 162.299 38.0609 132.79 38.061C109.931 38.061 74.6508 33.3536 65.914 68.9661C64.5904 74.3618 60.3474 78.5204 54.9677 79.9103C-3.68512 95.0641 55.3718 162.998 0.0341797 211.409H0L0.000219822 0.000916127C45.0645 0.00135653 49.9426 0 86.454 0C133.588 6.42285e-09 130.975 0.000976373 178.198 0.000976373Z'
 
-// Half-path strokes: centre peak → outer corner (draw outward L+R simultaneously).
-const HEADER_LEFT =
-  'M196.5 87.3859 C166.207 31.1282 42.9478 107.317 42.9478 56.846 V43.8501 C20.6641 48.1238 0 31.0462 0 8.35612 V0'
-const HEADER_RIGHT =
-  'M196.5 87.3859 C226.655 31.3836 350.052 107.23 350.052 56.846 V43.8501 C372.336 48.1238 393 31.0462 393 8.35616 V0'
-const FOOTER_LEFT =
-  'M196.5 0 C166.345 56.0023 42.9478 -19.844 42.9478 30.5399 V43.5358 C20.6641 39.2621 0 56.3397 0 79.0298 V87.3859'
-const FOOTER_RIGHT =
-  'M196.5 0 C226.793 56.2577 350.052 -19.9307 350.052 30.5399 V43.5358 C372.336 39.2626 393 56.3397 393 79.0298 V87.3859'
+// SVG transform that flips the wave vertically (bump hangs down, flat at top).
+// Used on path elements — does NOT create a CSS compositing group, so
+// backdrop-filter inside the same SVG works correctly.
+const FLIP = 'scale(1,-1) translate(0,-87.3859)'
 
-const WAVE_AR = 393 / 87.3859
+// Half-wave stroke paths for the intro drawing animation.
+// Both are in original (un-flipped) SVG coords; FLIP is applied via <g transform>.
+// LEFT:  starts at top-left corner  → curves down → meets centre bump peak
+// RIGHT: starts at top-right corner → curves down → meets centre bump peak
+const WAVE_LEFT  = 'M0 87.3859 V79.0298 C0 56.3397 20.6641 39.2621 42.9478 43.5358 V30.5399 C42.9478 -19.844 166.345 56.0023 196.5 0'
+const WAVE_RIGHT = 'M393 87.3859 V79.0298 C393 56.3397 372.336 39.2626 350.052 43.5358 V30.5399 C350.052 -19.9307 226.793 56.2577 196.5 0'
 
-const WA_NUMBER = '918766630191'
-function waUrl(message: string) {
-  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`
-}
-function waCategoryMsg(name: string) {
-  return `Hey, I am interested in ${name}`
-}
+const WAVE_AR   = 393 / 87.3859
+const ORNATE_AR = 393 / 211.423
+const ORNATE_CONTENT_RATIO = 110 / 211.423
+
+const WA_URL = `https://wa.me/918766630191?text=${encodeURIComponent('Hey, I want to enquire about the decoration items')}`
 
 // ── Intro animation ───────────────────────────────────────────
-// Header intro once per app load (lives in App). Gallery footer intro plays
-// each time a category screen mounts.
+// introPhase lives in App so it persists across screen navigations.
+// The effect inside HomeScreen uses a `cancelled` closure flag — this is the
+// correct pattern for React Strict Mode, which double-invokes effects in dev:
+// the first run's timers are cancelled on cleanup; the second run starts them
+// fresh, so the animation plays exactly once per app load.
 
-type IntroPhase = 'wait' | 'trace' | 'cards' | 'done'
+type IntroPhase = 'trace' | 'fill' | 'cards' | 'footer' | 'done'
 
-const T_TRACE_DUR = 1100
-const T_FILL_DUR  = 500
-const T_TEXT_DUR  = 400
-const T_CARDS_GAP = 700  // after header text, then enable scroll
+// Timeline (ms from HomeScreen mount):
+const T_TRACE  = 1100  // stroke drawing duration
+const T_FILL   = 1100  // → fill + text appear
+const T_CARDS  = 1500  // → cards slide up
+const T_FOOTER = 2000  // → footer slides up
+const T_DONE   = 2500  // → normal state (blur/scroll fully enabled)
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -78,12 +56,50 @@ function useFontsReady() {
   return ready
 }
 
+// ── Skeleton ──────────────────────────────────────────────────
+function SkeletonWave({ variant }: { variant: 'blue' | 'green' }) {
+  const cls = variant === 'blue' ? 'shimmer-blue' : 'shimmer-green'
+  const id  = `sk_${variant}`
+  return (
+    <div className={`relative w-full flex-shrink-0 overflow-hidden ${cls}`} style={{ aspectRatio: `${WAVE_AR}` }}>
+      <svg className="absolute inset-0 size-full" viewBox="0 0 393 87.3859" preserveAspectRatio="none">
+        <defs>
+          <mask id={id}>
+            <rect width="393" height="87.3859" fill="white" />
+            <path d={WAVE} fill="black" />
+          </mask>
+        </defs>
+        <rect width="393" height="87.3859" fill="white" mask={`url(#${id})`} />
+      </svg>
+    </div>
+  )
+}
+function SkeletonCard() {
+  return (
+    <div className="w-full flex flex-col gap-4">
+      <div className="shimmer w-full" style={{ aspectRatio: '1/1', borderRadius: 4 }} />
+      <div className="shimmer w-full" style={{ height: 48, borderRadius: 62 }} />
+    </div>
+  )
+}
+function HomeSkeletonScreen() {
+  return (
+    <div className="absolute inset-0 flex flex-col bg-white z-50">
+      <SkeletonWave variant="blue" />
+      <div className="flex-1 flex flex-col gap-10 px-4 py-4 overflow-hidden">
+        <SkeletonCard /><SkeletonCard />
+      </div>
+      <SkeletonWave variant="green" />
+    </div>
+  )
+}
+
 // ── Background ────────────────────────────────────────────────
 function BgImage() {
   return (
     <img src={bgImg} alt="" aria-hidden
       loading="eager" fetchPriority="high" decoding="async"
-      className="pointer-events-none absolute inset-0 size-full object-cover opacity-75"
+      className="pointer-events-none absolute inset-0 size-full object-cover opacity-85"
     />
   )
 }
@@ -113,158 +129,82 @@ function WaveBlur({ clipId, path, w = 393, h = 87.3859, active, pathTransform }:
   )
 }
 
-// Shared stroke-draw props. vector-effect keeps the line visible under preserveAspectRatio="none".
-function strokeDrawProps(opts: {
-  color: string
-  go: boolean
-  visible: boolean
-  duration: number
-}) {
-  return {
+// ── Blue sticky header ────────────────────────────────────────
+interface BlueHeaderProps {
+  label: string; scrolled: boolean; introPhase: IntroPhase
+}
+function BlueHeader({ label, scrolled, introPhase }: BlueHeaderProps) {
+  const inIntro = introPhase !== 'done'
+  const showFill = introPhase !== 'trace'
+
+  // If intro already played (navigated back), start in drawn state.
+  const [traceGo, setTraceGo] = useState(() => introPhase !== 'trace')
+  useEffect(() => {
+    if (introPhase !== 'trace') return
+    const id = requestAnimationFrame(() => setTraceGo(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  const strokeProps = {
     fill: 'none' as const,
-    stroke: opts.color,
-    strokeWidth: 2.5,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
+    stroke: 'rgba(255,255,255,0.9)',
+    strokeWidth: 1.8,
     pathLength: 1,
     strokeDasharray: 1,
-    vectorEffect: 'non-scaling-stroke' as const,
     style: {
-      strokeDashoffset: opts.go ? 0 : 1,
-      opacity: opts.visible ? 1 : 0,
-      transition: `stroke-dashoffset ${opts.duration}ms ease-in-out, opacity 280ms ease-in-out`,
+      strokeDashoffset: traceGo ? 0 : 1,
+      transition: `stroke-dashoffset ${T_TRACE}ms cubic-bezier(0.4,0,0.2,1)`,
+      opacity: showFill ? 0 : 1,
+      // fade stroke out as fill comes in
+      ...(showFill && { transition: `stroke-dashoffset ${T_TRACE}ms cubic-bezier(0.4,0,0.2,1), opacity 300ms ease-in-out` }),
     } as React.CSSProperties,
   }
-}
-
-/** Runs stroke → fill → text, advancing only after stroke CSS transition actually ends. */
-type ChromeStep = 'stroke' | 'fill' | 'text' | 'done'
-function useChromeIntro(play: boolean, onComplete?: () => void) {
-  const [step, setStep] = useState<ChromeStep>(() => (play ? 'stroke' : 'done'))
-  const [traceGo, setTraceGo] = useState(false)
-  const strokeDone = useRef(false)
-  const onCompleteRef = useRef(onComplete)
-  onCompleteRef.current = onComplete
-
-  // play false→true (or mount with play): run sequence from stroke.
-  // play true→false after finish: keep final 'done' paint.
-  useEffect(() => {
-    if (!play) {
-      setTraceGo(false)
-      return
-    }
-    strokeDone.current = false
-    setTraceGo(false)
-    setStep('stroke')
-  }, [play])
-
-  useEffect(() => {
-    if (!play || step !== 'stroke') return
-    strokeDone.current = false
-    // Double rAF so dashoffset=1 paints before animating to 0
-    let id2 = 0
-    const id1 = requestAnimationFrame(() => {
-      id2 = requestAnimationFrame(() => setTraceGo(true))
-    })
-    return () => {
-      cancelAnimationFrame(id1)
-      cancelAnimationFrame(id2)
-    }
-  }, [play, step])
-
-  // Fallback if transitionend doesn't fire (hidden/offscreen edge cases).
-  useEffect(() => {
-    if (!play || step !== 'stroke' || !traceGo) return
-    const t = window.setTimeout(() => {
-      if (strokeDone.current) return
-      strokeDone.current = true
-      setStep('fill')
-    }, T_TRACE_DUR + 80)
-    return () => clearTimeout(t)
-  }, [play, step, traceGo])
-
-  useEffect(() => {
-    if (!play || step !== 'fill') return
-    const t = window.setTimeout(() => setStep('text'), T_FILL_DUR)
-    return () => clearTimeout(t)
-  }, [play, step])
-
-  useEffect(() => {
-    if (!play || step !== 'text') return
-    const t = window.setTimeout(() => {
-      setStep('done')
-      onCompleteRef.current?.()
-    }, T_TEXT_DUR)
-    return () => clearTimeout(t)
-  }, [play, step])
-
-  const onStrokeTransitionEnd = (e: React.TransitionEvent<SVGPathElement>) => {
-    if (e.propertyName !== 'stroke-dashoffset') return
-    if (!play || strokeDone.current || step !== 'stroke') return
-    strokeDone.current = true
-    setStep('fill')
-  }
-
-  return {
-    step,
-    traceGo,
-    onStrokeTransitionEnd,
-    showFill: step === 'fill' || step === 'text' || step === 'done',
-    showText: step === 'text' || step === 'done',
-    settled: step === 'done',
-    tracing: step === 'stroke',
-  }
-}
-
-// ── Blue sticky header ────────────────────────────────────────
-function BlueHeader({
-  label, scrolled, playIntro, onIntroComplete,
-}: {
-  label: string
-  scrolled: boolean
-  playIntro: boolean
-  onIntroComplete?: () => void
-}) {
-  const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
-    useChromeIntro(playIntro, onIntroComplete)
-
-  const stroke = strokeDrawProps({
-    color: '#007AB1',
-    go: traceGo,
-    visible: tracing,
-    duration: T_TRACE_DUR,
-  })
 
   return (
     <div className="relative w-full h-full">
       <svg className="absolute inset-0 size-full"
         viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-        {settled && <WaveBlur clipId="blueH_wblur" path={HEADER} active={scrolled} />}
+
+        {/* ── Blur (only after intro, only when scrolled) ── */}
+        {!inIntro && (
+          <WaveBlur clipId="blueH_wblur" path={WAVE} active={scrolled} pathTransform={FLIP} />
+        )}
+
+        {/* ── Solid fill — fades in after trace ── */}
         <path
-          d={HEADER}
+          d={WAVE} transform={FLIP}
           fill="url(#blueHGrad)"
           style={{
-            fillOpacity: showFill ? (settled && scrolled ? 0.75 : 1) : 0,
-            transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
+            fillOpacity: showFill ? (inIntro ? 1 : (scrolled ? 0.75 : 1)) : 0,
+            transition: 'fill-opacity 450ms ease-in-out',
           }}
         />
-        <path d={HEADER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
-        <path d={HEADER_RIGHT} {...stroke} />
+
+        {/* ── Intro stroke traces (left + right, simultaneous) ── */}
+        {/* Rendered inside a <g> with the same FLIP so they follow the wave shape */}
+        <g transform={FLIP}>
+          <path d={WAVE_LEFT}  {...strokeProps} />
+          <path d={WAVE_RIGHT} {...strokeProps} />
+        </g>
+
         <defs>
-          <linearGradient id="blueHGrad" x1="196.5" y1="80.823" x2="196.5" y2="0" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#007AB1" /><stop offset="1" stopColor="#00579A" />
+          <linearGradient id="blueHGrad" x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
+            {/* Stops reversed so gradient reads correctly after vertical flip */}
+            <stop stopColor="#00579A" /><stop offset="1" stopColor="#007AB1" />
           </linearGradient>
         </defs>
       </svg>
+
+      {/* ── Label — fades in with fill ── */}
       <span
-        className="absolute text-center text-white z-10 pointer-events-none"
+        className="absolute left-0 right-0 text-center text-white z-10 pointer-events-none"
         style={{
-          top: '43.4%', left: 24, right: 24,
-          transform: `translateY(-50%) translateY(${showText ? 0 : 8}px)`,
+          top: '43.4%',
+          transform: `translateY(-50%) translateY(${showFill ? 0 : 6}px)`,
           fontFamily: FONT_BOLD, fontWeight: 780,
           fontSize: FS_CHROME, lineHeight: 1.2,
-          opacity: showText ? 1 : 0,
-          transition: `opacity ${T_TEXT_DUR}ms ease-in-out, transform ${T_TEXT_DUR}ms ease-in-out`,
+          opacity: showFill ? 1 : 0,
+          transition: 'opacity 400ms ease-out, transform 400ms ease-out',
         }}
       >
         {label}
@@ -273,173 +213,136 @@ function BlueHeader({
   )
 }
 
-// ── Green sticky footer ───────────────────────────────────────
-function GreenFooter({
-  label, scrolled, href, playIntro = false, onIntroComplete, visible = true,
-}: {
-  label: string
-  scrolled: boolean
-  href: string
-  playIntro?: boolean
-  onIntroComplete?: () => void
-  visible?: boolean
-}) {
-  const uid = useId().replace(/:/g, '')
-  const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
-    useChromeIntro(playIntro, onIntroComplete)
+// ── Rotating line (subtle slide-up, ease-in-out, infinite) ────
+const ROTATE_HOLD_MS = 2000
+const ROTATE_MOVE_MS = 450
+const ROTATE_NUDGE = '28%'
 
-  const stroke = strokeDrawProps({
-    color: '#4CED77',
-    go: traceGo,
-    visible: tracing,
-    duration: T_TRACE_DUR,
-  })
+function RotatingLines({
+  lines,
+  style,
+}: {
+  lines: string[]
+  style?: React.CSSProperties
+}) {
+  const [idx, setIdx] = useState(0)
+  const [sliding, setSliding] = useState(false)
+
+  useEffect(() => {
+    if (lines.length < 2) return
+    const hold = setInterval(() => setSliding(true), ROTATE_HOLD_MS)
+    return () => clearInterval(hold)
+  }, [lines.length])
+
+  useEffect(() => {
+    if (!sliding) return
+    const t = setTimeout(() => {
+      setIdx((i) => (i + 1) % lines.length)
+      setSliding(false)
+    }, ROTATE_MOVE_MS)
+    return () => clearTimeout(t)
+  }, [sliding, lines.length])
+
+  if (lines.length < 2) {
+    return <span style={style}>{lines[0]}</span>
+  }
+
+  const cur = lines[idx]
+  const next = lines[(idx + 1) % lines.length]
+  const ease = `transform ${ROTATE_MOVE_MS}ms ease-in-out, opacity ${ROTATE_MOVE_MS}ms ease-in-out`
 
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="pointer-events-auto block active:opacity-75" aria-label={label}
-      style={{ visibility: visible ? 'visible' : 'hidden' }}>
+    <span
+      className="relative block w-full overflow-hidden"
+      style={{ height: '1.4em' }}
+      aria-live="polite"
+    >
+      <span
+        className="absolute inset-x-0 top-0 text-center"
+        style={{
+          ...style,
+          transform: sliding ? `translateY(-${ROTATE_NUDGE})` : 'translateY(0)',
+          opacity: sliding ? 0 : 1,
+          transition: sliding ? ease : 'none',
+        }}
+      >
+        {cur}
+      </span>
+      <span
+        className="absolute inset-x-0 top-0 text-center"
+        aria-hidden={!sliding}
+        style={{
+          ...style,
+          transform: sliding ? 'translateY(0)' : `translateY(${ROTATE_NUDGE})`,
+          opacity: sliding ? 1 : 0,
+          transition: sliding ? ease : 'none',
+        }}
+      >
+        {next}
+      </span>
+    </span>
+  )
+}
+
+// ── Green sticky footer ───────────────────────────────────────
+function GreenFooter({
+  lines,
+  scrolled,
+  blurId = 'greenF_wblur',
+}: {
+  lines: string | string[]
+  scrolled: boolean
+  /** Unique clip id when two footers can mount across navigations */
+  blurId?: string
+}) {
+  const labels = Array.isArray(lines) ? lines : [lines]
+  const aria = labels.join(' — ')
+  return (
+    <a href={WA_URL} target="_blank" rel="noopener noreferrer"
+      className="pointer-events-auto block active:opacity-75" aria-label={aria}>
       <div className="relative w-full" style={{ aspectRatio: `${WAVE_AR}` }}>
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-          {settled && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
-          <path d={FOOTER} fill={`url(#${uid}_grad)`}
-            style={{
-              fillOpacity: showFill ? (settled && scrolled ? 0.75 : 1) : 0,
-              transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
-            }} />
-          <path d={FOOTER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
-          <path d={FOOTER_RIGHT} {...stroke} />
+          <WaveBlur clipId={blurId} path={WAVE} active={scrolled} />
+          <path d={WAVE} fill="url(#greenFGrad)"
+            style={{ fillOpacity: scrolled ? 0.75 : 1, transition: 'fill-opacity 350ms ease-in-out' }} />
           <defs>
-            <linearGradient id={`${uid}_grad`} x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
+            <linearGradient id="greenFGrad" x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
               <stop stopColor="#6CEB3E" /><stop offset="1" stopColor="#4CED77" />
             </linearGradient>
           </defs>
         </svg>
-        <span className="absolute left-0 right-0 text-center z-10 pointer-events-none"
-          style={{
-            bottom: '40%',
-            transform: `translateY(50%) translateY(${showText ? 0 : 8}px)`,
-            fontFamily: FONT_BOLD, fontWeight: 780,
-            fontSize: FS_CHROME, lineHeight: 1.2, color: '#0d2b08',
-            opacity: showText ? 1 : 0,
-            transition: `opacity ${T_TEXT_DUR}ms ease-in-out, transform ${T_TEXT_DUR}ms ease-in-out`,
-          }}>
-          {label}
+        <span className="absolute left-0 right-0 z-10 pointer-events-none px-3"
+          style={{ bottom: '40%', transform: 'translateY(50%)' }}>
+          <RotatingLines
+            lines={labels}
+            style={{
+              fontFamily: FONT_BOLD, fontWeight: 780,
+              fontSize: FS_CHROME, lineHeight: 1.4, color: '#0d2b08',
+            }}
+          />
         </span>
       </div>
     </a>
   )
 }
 
-function NavIconBtn({
-  label, onClick, src,
-}: {
-  label: string
-  onClick: () => void
-  src: string
-}) {
+// ── Ornate header — Screen 2 ──────────────────────────────────
+function OrnateHeader({ scrolled }: { scrolled: boolean }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className="flex items-center justify-center shrink-0 active:opacity-75"
-      style={{
-        width: NAV_BTN,
-        height: NAV_BTN,
-        borderRadius: 62,
-        background: 'linear-gradient(to top, #000 12.393%, #333)',
-      }}
-    >
-      <img src={src} alt="" width={24} height={24} className="block size-6" draggable={false} />
-    </button>
-  )
-}
-
-// Session image cache — skip placeholders for URLs already loaded this page life.
-const imgReady = new Set<string>()
-
-function warmImage(src: string) {
-  if (!src || imgReady.has(src)) return
-  const img = new Image()
-  img.onload = () => { imgReady.add(src) }
-  img.onerror = () => { imgReady.add(src) }
-  img.src = src
-}
-
-function warmCategoryImages(category: CategoryData) {
-  for (const p of category.photos) {
-    warmImage(p.thumb)
-    warmImage(p.full)
-  }
-}
-
-function DriveImg({
-  src, alt, priority, className, style,
-}: {
-  src: string
-  alt: string
-  priority?: boolean
-  className?: string
-  style?: React.CSSProperties
-}) {
-  const [loaded, setLoaded] = useState(() => imgReady.has(src))
-  const imgRef = useRef<HTMLImageElement>(null)
-
-  useEffect(() => {
-    if (imgReady.has(src)) {
-      setLoaded(true)
-      return
-    }
-    setLoaded(false)
-  }, [src])
-
-  useEffect(() => {
-    const el = imgRef.current
-    if (!el) return
-    if (el.complete && el.naturalWidth > 0) {
-      imgReady.add(src)
-      setLoaded(true)
-    }
-  }, [src])
-
-  const mark = () => {
-    imgReady.add(src)
-    setLoaded(true)
-  }
-
-  return (
-    <>
-      <img
-        src={placeholderImg}
-        alt=""
-        aria-hidden
-        className={className}
-        style={{
-          ...style,
-          opacity: loaded ? 0 : 1,
-          transition: 'opacity 280ms ease-in-out',
-        }}
-        draggable={false}
-      />
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        decoding="async"
-        className={className}
-        style={{
-          ...style,
-          opacity: loaded ? 1 : 0,
-          transition: 'opacity 280ms ease-in-out',
-        }}
-        draggable={false}
-        onLoad={mark}
-      />
-    </>
+    <div className="absolute inset-0">
+      <svg className="absolute inset-0 size-full"
+        viewBox="0 0 392.995 211.423" preserveAspectRatio="none" fill="none">
+        <WaveBlur clipId="ornate_wblur" path={ORNATE} w={392.995} h={211.423} active={scrolled} />
+        <path d={ORNATE} fill="url(#ornateGrad)"
+          style={{ fillOpacity: scrolled ? 0.75 : 1, transition: 'fill-opacity 350ms ease-in-out' }} />
+        <defs>
+          <linearGradient id="ornateGrad" x1="196.498" y1="15.879" x2="196.498" y2="211.423" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#007AB1" /><stop offset="1" stopColor="#00579A" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
   )
 }
 
@@ -465,178 +368,27 @@ function CardBlurOverlay({ uid }: { uid: string }) {
   )
 }
 
-// ── View-all button (fixed full width) ────────────────────────
-function ViewAllButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+// ── Viewport-grow button ──────────────────────────────────────
+function ViewportButton({ onClick, children, ariaLabel }: { onClick: () => void; children: React.ReactNode; ariaLabel?: string }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [wide, setWide] = useState(false)
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) setWide(true) }, { threshold: 0.6 })
+    obs.observe(el); return () => obs.disconnect()
+  }, [])
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center justify-center active:opacity-75"
+    <button ref={ref} type="button" onClick={onClick} aria-label={ariaLabel}
+      className="flex items-center justify-center overflow-hidden active:opacity-75"
       style={{
         paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
         borderRadius: 62,
         background: 'linear-gradient(to top, #000 12.393%, #333)',
-      }}
-    >
+        width: wide ? '100%' : '90%',
+        transition: 'width 600ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}>
       {children}
     </button>
-  )
-}
-
-// ── Card image scroller (infinite horizontal, ease-in-out) ────
-const DOT_H = 4
-const DOT_W = 4
-const DOT_ACTIVE_W = 12
-
-function CardDots({ count, active }: { count: number; active: number }) {
-  if (count <= 1) return null
-  return (
-    <div
-      className="flex items-center justify-center"
-      style={{ gap: 6, height: DOT_H, minHeight: DOT_H }}
-      aria-hidden
-    >
-      {Array.from({ length: count }, (_, i) => {
-        const on = i === active
-        return (
-          <span
-            key={i}
-            className="bg-white block shrink-0"
-            style={{
-              width: on ? DOT_ACTIVE_W : DOT_W,
-              height: DOT_H,
-              borderRadius: 9999,
-              opacity: on ? 1 : 0.55,
-              transition: 'width 500ms ease-in-out, opacity 500ms ease-in-out',
-              willChange: 'width, opacity',
-            }}
-          />
-        )
-      })}
-    </div>
-  )
-}
-
-function CardImageScroller({
-  photos, alt, onIndexChange, autoplay,
-}: {
-  photos: CategoryPhoto[]
-  alt: string
-  onIndexChange?: (i: number) => void
-  /** true after the card has stayed centred ≥1s */
-  autoplay: boolean
-}) {
-  const n = photos.length
-  const track = n > 1 ? [...photos, photos[0]] : photos
-  const [i, setI] = useState(0)
-  const [anim, setAnim] = useState(true)
-  const [drag, setDrag] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const [manual, setManual] = useState(false)
-  const startX = useRef<number | null>(null)
-  const active = i >= n ? 0 : i
-  const canAuto = autoplay && !manual && n > 1
-
-  useEffect(() => {
-    onIndexChange?.(active)
-  }, [active, onIndexChange])
-
-  // Reset manual lock when card loses autoplay (scrolled away)
-  useEffect(() => {
-    if (!autoplay) setManual(false)
-  }, [autoplay])
-
-  useEffect(() => {
-    if (!canAuto) return
-    if (i < n) {
-      const t = window.setTimeout(() => setI((x) => x + 1), SLIDE_MS)
-      return () => clearTimeout(t)
-    }
-    const t = window.setTimeout(() => {
-      setAnim(false)
-      setI(0)
-    }, SLIDE_EASE_MS)
-    return () => clearTimeout(t)
-  }, [i, n, canAuto])
-
-  useEffect(() => {
-    if (anim || i !== 0) return
-    const id = requestAnimationFrame(() => setAnim(true))
-    return () => cancelAnimationFrame(id)
-  }, [anim, i])
-
-  useEffect(() => {
-    if (n <= 1) return
-    const next = photos[(active + 1) % n]
-    const img = new Image()
-    img.src = next.thumb
-  }, [active, n, photos])
-
-  const goBy = (dir: number) => {
-    if (n <= 1) return
-    setManual(true)
-    setAnim(true)
-    setI((cur) => {
-      const base = cur >= n ? 0 : cur
-      return (base + dir + n) % n
-    })
-  }
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (n <= 1) return
-    startX.current = e.clientX
-    setDragging(true)
-    setDrag(0)
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-  }
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (startX.current == null) return
-    setDrag(e.clientX - startX.current)
-  }
-  const onPointerUp = () => {
-    if (startX.current == null) return
-    const dx = drag
-    startX.current = null
-    setDragging(false)
-    setDrag(0)
-    if (Math.abs(dx) > 40) goBy(dx < 0 ? 1 : -1)
-  }
-
-  const width = typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) : 360
-  const pct = i * 100 - (drag / Math.max(width, 1)) * 100
-
-  return (
-    <div
-      className="absolute inset-0 overflow-hidden"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      style={{ touchAction: 'pan-y' }}
-    >
-      <div
-        className="flex h-full"
-        style={{
-          transform: `translateX(-${pct}%)`,
-          transition: dragging || !anim
-            ? 'none'
-            : `transform ${SLIDE_EASE_MS}ms ease-in-out`,
-          willChange: 'transform',
-        }}
-      >
-        {track.map((photo, idx) => (
-          <div key={idx} className="relative h-full shrink-0 grow-0" style={{ flexBasis: '100%' }}>
-            <DriveImg
-              src={photo.thumb}
-              alt={idx === 0 ? alt : ''}
-              priority={idx === 0}
-              className="absolute inset-0 size-full object-cover object-center block pointer-events-none"
-              style={{ maxWidth: 'none' }}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -644,176 +396,144 @@ function CardImageScroller({
 interface CategoryCardProps {
   category: CategoryData; onViewAll: () => void
   introVisible: boolean; introDelay: number
-  scrollerRef: React.RefObject<HTMLElement | null>
-  scrollActive: boolean
 }
-function CategoryCard({
-  category, onViewAll, introVisible, introDelay, scrollerRef, scrollActive,
-}: CategoryCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null)
-  const [slide, setSlide] = useState(0)
-  const [armed, setArmed] = useState(false)
-  const onSlide = useCallback((i: number) => setSlide(i), [])
-
-  // Autoplay after the card has been mostly in view for 1s
-  useEffect(() => {
-    if (!scrollActive) {
-      setArmed(false)
-      return
-    }
-    const card = cardRef.current
-    const root = scrollerRef.current
-    if (!card || !root) return
-    let timer = 0
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        window.clearTimeout(timer)
-        if (e.isIntersecting && e.intersectionRatio >= 0.55) {
-          timer = window.setTimeout(() => setArmed(true), CARD_ARM_MS)
-        } else {
-          setArmed(false)
-        }
-      },
-      { root, threshold: [0, 0.55, 0.75, 1] },
-    )
-    obs.observe(card)
-    return () => {
-      obs.disconnect()
-      window.clearTimeout(timer)
-    }
-  }, [scrollActive, scrollerRef])
-
+function CategoryCard({ category, onViewAll, introVisible, introDelay }: CategoryCardProps) {
   return (
-    <div
-      ref={cardRef}
-      className="flex flex-col gap-4 items-center w-full"
+    <div className="flex flex-col gap-4 items-center w-full"
       style={{
         opacity: introVisible ? 1 : 0,
         transform: introVisible ? 'translateY(0)' : 'translateY(52px)',
         transition: `opacity 550ms ease-out ${introDelay}ms, transform 550ms cubic-bezier(0.22,1,0.36,1) ${introDelay}ms`,
       }}>
-      <div
-        className="relative w-full overflow-hidden"
-        style={{
-          aspectRatio: '1 / 1',
-          WebkitMaskImage: CARD_FRAME_MASK,
-          maskImage: CARD_FRAME_MASK,
-          WebkitMaskSize: '100% 100%',
-          maskSize: '100% 100%',
-          WebkitMaskRepeat: 'no-repeat',
-          maskRepeat: 'no-repeat',
-        }}
-      >
-        <CardImageScroller
-          photos={category.photos}
-          alt={category.galleryTitle}
-          onIndexChange={onSlide}
-          autoplay={armed}
-        />
+      <div className="relative w-full overflow-hidden cursor-pointer" style={{ aspectRatio: '1 / 1' }}
+        onClick={onViewAll}>
+        <img src={category.cardImage} alt={category.galleryTitle}
+          loading="eager" fetchPriority="high" decoding="async"
+          className="absolute inset-0 size-full object-cover block" style={{ maxWidth: 'none' }} />
         <CardBlurOverlay uid={category.id} />
-        <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end z-10 pb-4 pointer-events-none"
-          style={{ paddingLeft: 24, paddingRight: 24, gap: 12 }}>
-          <CardDots count={category.photos.length} active={slide} />
-          <div className="flex flex-col items-center w-full">
-            {category.lines.map((line, i) => (
-              <p key={i} className="text-white text-center leading-tight m-0 w-full"
-                style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_HEAD }}>{line}</p>
-            ))}
-          </div>
+        <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end z-10 px-4 pb-4">
+          {category.lines.map((line, i) => (
+            <p key={i} className="text-white text-center leading-tight m-0 w-full"
+              style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_HEAD }}>{line}</p>
+          ))}
         </div>
       </div>
-      <ViewAllButton onClick={onViewAll}>
-        <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}>
-          View all photos
-        </span>
-      </ViewAllButton>
+      <ViewportButton
+        onClick={onViewAll}
+        ariaLabel="View all photos — Prices starting from ₹499"
+      >
+        <RotatingLines
+          lines={['View all photos', 'Prices starting from ₹499']}
+          style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}
+        />
+      </ViewportButton>
     </div>
   )
 }
 
 // ── Screen 1 ─────────────────────────────────────────────────
 interface HomeScreenProps {
-  categories: CategoryData[]
   onViewAll: (cat: CategoryData) => void
   introPhase: IntroPhase
   setIntroPhase: (p: IntroPhase) => void
 }
-function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeScreenProps) {
+function HomeScreen({ onViewAll, introPhase, setIntroPhase }: HomeScreenProps) {
   const headerRef = useRef<HTMLDivElement>(null)
-  const scrollerRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [headerH, setHeaderH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
+  const [footerH, setFooterH] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
-  const onHeaderIntroComplete = useCallback(() => {
-    setIntroPhase('cards')
-  }, [setIntroPhase])
-
+  // ── Intro phase management ──────────────────────────────────
+  // `cancelled` flag is the correct Strict Mode pattern: the first effect run
+  // starts timers, Strict Mode cancels them on cleanup, the second run starts
+  // them fresh. Only the second run's timers fire, advancing introPhase normally.
+  // introPhase lives in App so it persists when navigating to Gallery and back.
   useEffect(() => {
-    if (introPhase !== 'cards') return
-    const t = window.setTimeout(() => setIntroPhase('done'), T_CARDS_GAP)
-    return () => clearTimeout(t)
-  }, [introPhase, setIntroPhase])
+    if (introPhase !== 'trace') return  // already played; skip on back-navigation
+    let cancelled = false
+    const set = (phase: IntroPhase, delay: number) =>
+      setTimeout(() => { if (!cancelled) setIntroPhase(phase) }, delay)
+    const timers = [
+      set('fill',   T_FILL),
+      set('cards',  T_CARDS),
+      set('footer', T_FOOTER),
+      set('done',   T_DONE),
+    ]
+    return () => { cancelled = true; timers.forEach(clearTimeout) }
+  }, [])
 
   useLayoutEffect(() => {
     const measure = () => {
       if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
+      if (footerRef.current) setFooterH(footerRef.current.offsetHeight)
     }
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  const cardsVisible = introPhase === 'cards' || introPhase === 'done'
-  const scrollable = introPhase === 'done'
+  const cardsVisible  = introPhase === 'cards' || introPhase === 'footer' || introPhase === 'done'
+  const footerVisible = introPhase === 'footer' || introPhase === 'done'
+  const scrollable    = introPhase === 'done'
 
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
 
+      {/* Sticky blue header */}
       <div ref={headerRef} className="absolute top-0 left-0 right-0 z-30" style={{ aspectRatio: `${WAVE_AR}` }}>
-        <BlueHeader
-          label="Ritisha Creations"
-          scrolled={scrolled}
-          playIntro={introPhase === 'trace'}
-          onIntroComplete={onHeaderIntroComplete}
-        />
+        <BlueHeader label="Riti Creations" scrolled={scrolled} introPhase={introPhase} />
       </div>
 
+      {/* Footer — slides up from below on intro, then stays fixed */}
       <div
-        ref={scrollerRef}
+        className="absolute bottom-0 left-0 right-0 z-20"
+        ref={footerRef}
+        style={{
+          transform: footerVisible ? 'translateY(0)' : 'translateY(105%)',
+          transition: 'transform 480ms cubic-bezier(0.22,1,0.36,1)',
+        }}
+      >
+        <GreenFooter lines="Whatsapp Us" scrolled={scrolled} blurId="home_greenF_wblur" />
+      </div>
+
+      {/* Scrollable content */}
+      <div
         className="absolute inset-0 overflow-y-auto scroll-smooth"
         style={{
           paddingTop: headerH + 16,
+          paddingBottom: footerH + 16,
+          // Disable scroll during intro so animation plays cleanly
           overflowY: scrollable ? 'auto' : 'hidden',
         }}
         onScroll={(e) => scrollable && setScrolled(e.currentTarget.scrollTop > 8)}
       >
-        <div className="flex flex-col gap-10 items-center px-4 pt-4">
-          {categories.map((cat, i) => (
+        <div className="flex flex-col gap-10 items-center px-4 pt-4 pb-4">
+          {CATEGORIES.map((cat, i) => (
             <CategoryCard
               key={cat.id}
               category={cat}
               onViewAll={() => onViewAll(cat)}
               introVisible={cardsVisible}
-              introDelay={i * 180}
-              scrollerRef={scrollerRef}
-              scrollActive={scrollable}
+              introDelay={i * 180}  // stagger 180ms per card
             />
           ))}
           <p
-            className="m-0 w-full text-center"
+            className="m-0 w-full text-center text-[#232323]"
             style={{
               fontFamily: FONT_BOLD,
               fontWeight: 780,
               fontSize: FS_CHROME,
               lineHeight: 1.4,
-              color: '#1a1a1a',
+              opacity: 0.75,
               paddingTop: 40,
               paddingBottom: 40,
             }}
           >
-            handcrafted and made with love ❤️
+            Handcrafted and made with love ❤️
           </p>
         </div>
       </div>
@@ -822,199 +542,92 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
 }
 
 // ── Gallery photo tile ────────────────────────────────────────
-function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: string; priority?: boolean }) {
+function PhotoTile({ src, alt, priority }: { src: string; alt: string; priority?: boolean }) {
   return (
     <div className="relative w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
-      <DriveImg
-        src={photo.full}
-        alt={alt}
-        priority={priority}
-        className="absolute inset-0 size-full object-cover object-center block"
-        style={{ maxWidth: 'none' }}
-      />
-    </div>
-  )
-}
-
-function GalleryNavChrome({ children, visible }: { children: React.ReactNode; visible: boolean }) {
-  return (
-    <div className="absolute top-0 left-0 right-0 z-20 w-full overflow-hidden pointer-events-none">
-      <div
-        className="relative pointer-events-auto"
-        style={{
-          padding: 16,
-          transform: visible ? 'translateY(0)' : 'translateY(-110%)',
-          opacity: visible ? 1 : 0,
-          transition: `transform ${GALLERY_NAV_MS}ms ease-in-out, opacity ${GALLERY_NAV_MS}ms ease-in-out`,
-        }}
-      >
-        {/* Progressive blur 4→0 + black gradient @ 25% overall */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-          <div
-            className="absolute inset-0"
-            style={{
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
-              maskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
-              maskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
-              WebkitMaskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: 'linear-gradient(to bottom, #000 0%, transparent 100%)',
-              opacity: 0.25,
-            }}
-          />
-        </div>
-        <div className="relative flex items-center w-full" style={{ gap: 8 }}>
-          {children}
-        </div>
-      </div>
+      <img src={src} alt={alt}
+        loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async" className="absolute inset-0 size-full object-cover block"
+        style={{ maxWidth: 'none' }} />
     </div>
   )
 }
 
 // ── Screen 2 ─────────────────────────────────────────────────
 function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
+  const headerRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
-  const [footerReady, setFooterReady] = useState(false)
-  const [sharing, setSharing] = useState(false)
-  const [navIn, setNavIn] = useState(false)
-  const [showPhotos, setShowPhotos] = useState(false)
-  const [playFooter, setPlayFooter] = useState(false)
+  const [showBack, setShowBack] = useState(false)
+  const [headerH, setHeaderH] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / ORNATE_AR : 0)
+  const [footerH, setFooterH] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
-  // Nav + footer intro after paint; warm gallery images into session cache
-  useEffect(() => {
-    setScrolled(false)
-    setFooterReady(false)
-    setNavIn(false)
-    setShowPhotos(false)
-    setPlayFooter(false)
-
-    prefetchCategoryShare(category)
-    warmCategoryImages(category)
-
-    let cancelled = false
-    let id2 = 0
-    const id1 = requestAnimationFrame(() => {
-      id2 = requestAnimationFrame(() => {
-        if (cancelled) return
-        setNavIn(true)
-        setShowPhotos(true)
-        setPlayFooter(true)
-      })
-    })
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(id1)
-      cancelAnimationFrame(id2)
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
+      if (footerRef.current) setFooterH(footerRef.current.offsetHeight)
     }
-  }, [category])
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
 
-  useEffect(() => {
-    document.title = `${category.galleryTitle} · Ritisha Creations`
-    const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
-    const setMeta = (prop: string, content: string) => {
-      let el = document.querySelector(`meta[property="${prop}"]`) as HTMLMetaElement | null
-      if (!el) {
-        el = document.createElement('meta')
-        el.setAttribute('property', prop)
-        document.head.appendChild(el)
-      }
-      el.content = content
-    }
-    setMeta('og:title', category.galleryTitle)
-    setMeta('og:description', 'Hey, check out this amazing piece by Ritisha Creations')
-    setMeta('og:url', `${window.location.origin}${categoryPath(category.slug)}`)
-    if (cover) setMeta('og:image', cover.full)
-    return () => { document.title = 'Ritisha Creations' }
-  }, [category])
+  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const top = e.currentTarget.scrollTop
+    setScrolled(top > 8)
+    setShowBack(top > 40)
+  }, [])
 
-  const onShare = useCallback(async () => {
-    if (sharing) return
-    setSharing(true)
-    try { await shareCategory(category) }
-    finally { setSharing(false) }
-  }, [category, sharing])
+  const contentTop = headerH * ORNATE_CONTENT_RATIO
 
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
-      <div className="absolute bottom-0 left-0 right-0 z-30">
-        {playFooter && (
-          <GreenFooter
-            key={category.id}
-            label="DM us for more information"
-            scrolled={footerReady ? scrolled : false}
-            href={waUrl(waCategoryMsg(category.galleryTitle))}
-            playIntro
-            onIntroComplete={() => setFooterReady(true)}
-          />
-        )}
+      <div ref={headerRef} className="absolute top-0 left-0 right-0 z-30" style={{ aspectRatio: `${ORNATE_AR}` }}>
+        <OrnateHeader scrolled={scrolled} />
       </div>
-      <GalleryNavChrome visible={navIn}>
-        <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
-        <h1
-          className="flex-1 min-w-0 m-0 text-center text-white"
-          style={{
-            fontFamily: FONT_SEMI,
-            fontWeight: 670,
-            fontSize: FS_CHROME,
-            lineHeight: 'normal',
-            letterSpacing: '-0.16px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {category.galleryTitle}
-        </h1>
-        <NavIconBtn
-          label={sharing ? 'Sharing…' : 'Share'}
-          onClick={onShare}
-          src={iconShare}
+      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-20">
+        <GreenFooter
+          lines={['DM us for more information', 'Customization also available']}
+          scrolled={scrolled}
+          blurId="gallery_greenF_wblur"
         />
-      </GalleryNavChrome>
-      <div
-        className="absolute inset-0 overflow-y-auto"
-        onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
-      >
-        <div
-          className="flex flex-col"
-          style={{
-            gap: 16,
-            opacity: showPhotos ? 1 : 0,
-            transition: 'opacity 480ms ease-in-out',
-          }}
-        >
-          {category.photos.map((photo, i) => (
-            <GalleryPhoto
-              key={photo.id}
-              photo={photo}
-              alt={`${category.galleryTitle} photo ${i + 1}`}
-              priority={i < 2}
-            />
+      </div>
+      <div className="absolute inset-0 overflow-y-auto scroll-smooth"
+        style={{ paddingTop: contentTop, paddingBottom: footerH + 16 }}
+        onScroll={onScroll}>
+        <div className="px-4 pt-4 pb-6 flex justify-center">
+          <h1 className="text-[#232323] text-center leading-tight m-0"
+            style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_HEAD }}>
+            {category.galleryTitle}
+          </h1>
+        </div>
+        <div className="flex flex-col gap-10 items-center px-4 pb-4">
+          {category.photos.map((src, i) => (
+            <PhotoTile key={i} src={src} alt={`${category.galleryTitle} photo ${i + 1}`} priority={i === 0} />
           ))}
         </div>
       </div>
+      {/* Go Back pill */}
+      <div className="absolute z-40" style={{
+        top: 16, left: '50%',
+        transform: `translateX(-50%) translateY(${showBack ? 0 : -12}px)`,
+        opacity: showBack ? 1 : 0, pointerEvents: showBack ? 'auto' : 'none',
+        transition: 'opacity 400ms ease-in-out, transform 400ms ease-in-out',
+        width: 'min(362px, calc(100% - 32px))',
+      }}>
+        <button onClick={onBack} className="w-full flex items-center justify-center active:opacity-75"
+          style={{ paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
+                   borderRadius: 62, background: 'linear-gradient(to top, #000 12.393%, #333)' }}>
+          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}>
+            Go Back
+          </span>
+        </button>
+      </div>
     </div>
   )
-}
-
-function pathSlug() {
-  const raw = window.location.pathname.replace(/^\/+|\/+$/g, '')
-  if (!raw || raw.includes('.')) return null
-  return raw
 }
 
 // ── Root ──────────────────────────────────────────────────────
@@ -1022,112 +635,38 @@ export default function App() {
   const [selected, setSelected] = useState<CategoryData | null>(null)
   const [visible,  setVisible]  = useState(true)
   const fontsReady = useFontsReady()
-  const [categories, setCategories] = useState<CategoryData[]>(
-    () => readCatalogueCache() ?? [],
-  )
-  const [catalogueReady, setCatalogueReady] = useState(false)
-  const [bootDone, setBootDone] = useState(() => Boolean(pathSlug()))
-  // introPhase waits until shloka finishes (unless deep-link skips boot)
-  const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
-    pathSlug() ? 'trace' : 'wait',
-  )
 
-  useEffect(() => {
-    let cancelled = false
-    const deep = Boolean(pathSlug())
-
-    ;(async () => {
-      const { categories: next } = await loadCatalogue()
-      if (cancelled) return
-      setCategories(next)
-      setCatalogueReady(true)
-
-      const slug = pathSlug()
-      if (slug) {
-        const match = next.find((c) => c.slug === slug)
-        if (match) setSelected(match)
-      }
-
-      // Warm all thumbs + fulls for this session (DriveImg skips placeholders once ready)
-      for (const c of next) {
-        prefetchCategoryShare(c)
-        warmCategoryImages(c)
-      }
-    })()
-
-    if (deep) {
-      // Deep link: no shloka; still wait for fonts + catalogue before showing UI
-      setBootDone(true)
-    }
-
-    return () => { cancelled = true }
-  }, [])
-
-  // Deep-link when cache already had categories before fetch finishes
-  useEffect(() => {
-    if (selected || !categories.length) return
-    const slug = pathSlug()
-    if (!slug) return
-    const match = categories.find((c) => c.slug === slug)
-    if (match) setSelected(match)
-  }, [categories, selected])
-
-  const onShlokaDone = useCallback(() => {
-    setBootDone(true)
-    setIntroPhase('trace')
-  }, [])
+  // introPhase lives here so navigating to Gallery and back doesn't replay it.
+  const [introPhase, setIntroPhase] = useState<IntroPhase>('trace')
 
   const navigate = useCallback((cat: CategoryData | null) => {
     setVisible(false)
-    setTimeout(() => {
-      setSelected(cat)
-      const path = cat ? categoryPath(cat.slug) : '/'
-      window.history.pushState({}, '', path)
-      setVisible(true)
-    }, 280)
+    setTimeout(() => { setSelected(cat); setVisible(true) }, 280)
   }, [])
-
-  useEffect(() => {
-    const onPop = () => {
-      const slug = pathSlug()
-      if (!slug) {
-        setSelected(null)
-        return
-      }
-      const match = categories.find((c) => c.slug === slug)
-      setSelected(match ?? null)
-    }
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [categories])
-
-  const contentReady = fontsReady && catalogueReady && (bootDone || Boolean(pathSlug()))
-  const showShloka = !pathSlug() && !bootDone
 
   return (
     <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
       <div className="relative w-full max-w-[480px] h-[100dvh]">
-        {showShloka && (
-          <ShlokaIntro ready={fontsReady && catalogueReady} onDone={onShlokaDone} />
-        )}
-        {/* Mount home only after shloka so BlueHeader intro starts from stroke, not a finished frame */}
-        {contentReady && (
-          <div className="absolute inset-0"
-            style={{
-              opacity: visible ? 1 : 0,
-              transform: visible ? 'translateY(0)' : 'translateY(10px)',
-              transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
-            }}>
-            {selected
-              ? <GalleryScreen category={selected} onBack={() => navigate(null)} />
-              : <HomeScreen
-                  categories={categories}
-                  onViewAll={(cat) => navigate(cat)}
-                  introPhase={introPhase}
-                  setIntroPhase={setIntroPhase}
-                />}
-          </div>
-        )}
+        {/* Skeleton fades out when fonts are ready */}
+        <div className="absolute inset-0 z-50 pointer-events-none"
+          style={{ opacity: fontsReady ? 0 : 1, transition: 'opacity 380ms ease-in-out' }}>
+          <HomeSkeletonScreen />
+        </div>
+        {/* Main content */}
+        <div className="absolute inset-0"
+          style={{
+            opacity: fontsReady ? (visible ? 1 : 0) : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(10px)',
+            transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
+          }}>
+          {selected
+            ? <GalleryScreen category={selected} onBack={() => navigate(null)} />
+            : <HomeScreen
+                onViewAll={(cat) => navigate(cat)}
+                introPhase={introPhase}
+                setIntroPhase={setIntroPhase}
+              />}
+        </div>
       </div>
     </div>
   )

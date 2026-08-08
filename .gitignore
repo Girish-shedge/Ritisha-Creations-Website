@@ -3,10 +3,8 @@ dist/
 build/
 .cache/
 .env*
-!.env.example
-.vercel
 .vite/
-.cursor/
+public/gallery/
 vite.config.*.timestamp-*
 *.tsbuildinfo
 *-debug.log*

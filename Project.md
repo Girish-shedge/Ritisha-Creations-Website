@@ -1,157 +1,207 @@
-# Ritisha Creations — Decoration Showcase
+# Riti Creations — Decoration Showcase App
 
-Mobile-first decoration showcase (max-width 480px). React 19 + Vite 8 + Tailwind CSS v4. Live: https://ritishacreations.vercel.app
-
----
-
-## What it is
-
-Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer CTA opens WhatsApp.
-
-**WhatsApp:** `+918766630191`  
-**Gallery message:** `Hey, I am interested in {galleryTitle}`
+Mobile-first decoration showcase app for Riti Creations. Built with React 19 + Vite 8 + Tailwind CSS v4 inside Figma Make.
 
 ---
 
-## Content source (Google Drive)
+## What It Is
 
-**Root folder:** [Ritisha Creations Drive](https://drive.google.com/drive/folders/1blEF1JY8k4fGg66R_O1ZcSyN6wFHz9W8) (`VITE_DRIVE_FOLDER_ID`)
+A two-screen mobile app (max-width 480px) that showcases decoration categories with a photo gallery. Visitors can browse categories on the home screen and tap through to a full-screen photo gallery per category. All CTAs link to WhatsApp for enquiries.
 
-| Drive | App |
-|-------|-----|
-| Subfolder name | Category title + slug (`/modak-pushp-backdrop`) |
-| Files named `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = share/OG cover |
-| Empty / non-image folders | Skipped |
-
-- Fetched on **every page load** via Google Drive API (`VITE_GOOGLE_DRIVE_API_KEY`).
-- Home uses **w640** thumbs; gallery uses **w1200**; placeholder until first load, then session-cached (no flash on revisit).
-- Parallel folder fetches; warm thumbs + fulls after catalogue load (same page session).
-- On API failure: last cached catalogue (`localStorage` `ritisha.driveCatalogue.v2`).
-- Share proxy: `/api/media?id=` (Vercel + Vite dev middleware).
-
-Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA rewrite in `vercel.json`.
+**WhatsApp number:** `+918766630191`
+**WhatsApp URL:** `https://wa.me/918766630191?text=Hey%2C%20I%20want%20to%20enquire%20about%20the%20decoration%20items`
 
 ---
 
 ## Screens
 
-### Home
-- Sticky blue wave header — "Ritisha Creations" (stroke → fill → text intro once per load)
-- Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together
-- **"View all photos"** fixed full-width button opens gallery (card image is not a tap target)
-- Simple vertical list (no scroll scale/opacity)
-- End tagline: “handcrafted and made with love ❤️” (`FS_CHROME`, **40px** top + bottom)
-- Site `bg.png` at **75%** opacity
-- No green WhatsApp footer on Home
+### Screen 1 — Home
+- **Sticky blue wave header** — "Riti Creations" branding. Animated intro (stroke trace + fill). Backdrop blur activates on scroll, clipped to SVG wave shape only.
+- **Category cards** — Scrollable list. Each card has a square photo, title overlay with gradient blur, and a "View all photos" grow button.
+- **Sticky green wave footer** — "Whatsapp Us" CTA linking to WhatsApp.
 
-### Gallery
-- Overlay Figma nav: slides in from top (ease-in-out); black gradient @25% + progressive blur 4→0; circular back/share; white truncated title
-- Share: `Hey, check out this amazing piece by *Ritisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
-- Edge-to-edge **1:1** photos, **16px** gap (flush under overlay nav + footer); session image cache skips placeholders on revisit
-- Footer chrome intro (stroke → fill → text) each open; images warm in parallel
-- Sticky green footer — "DM us for more information"
-- Site `bg.png` at **75%** opacity
-
-Navigation: History API paths + 280ms fade. Back → `/`.
+### Screen 2 — Gallery
+- **Sticky ornate blue arch header** — SVG arch shape. Backdrop blur on scroll.
+- **Content starts at arch opening** — `top: 110px` in Figma = 52.07% of ornate header height (`ORNATE_CONTENT_RATIO = 110/211.423`).
+- **Gallery title + photo grid** — Vertical list of square photos.
+- **"Go Back" pill** — Appears after scrolling 40px; centred above content.
+- **Sticky green wave footer** — "DM us for more information" CTA.
 
 ---
 
-## Intro
+## Navigation
 
-### Shloka boot (first home load)
-Two Devanagari lines (Figma `309:764`), fill-only `#FC9C02`: glyphs fade in left→right, line 1 then line 2 (~2s each, denser glyphs get more time). After 4s, slow pulse 100%↔50% (~2.2s cycle) until fonts + Drive catalogue are ready; skip pulse if already ready. Fade out → mount home (so header stroke→fill→text runs from the start). Skipped on category deep links.
-
-### Home header (once per page load after shloka)
-Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  
-`introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay on Gallery → Home.
-
-### Gallery footer (each category open)
-Same stroke → fill → text chain on "DM us for more information".
+Transitions between screens with a 280ms fade + slide (`opacity` + `translateY(10px)`). `App` manages `selected: CategoryData | null` — null = Home, non-null = Gallery.
 
 ---
 
-## Design tokens
+## Intro Animation (Home, plays once per app load)
+
+| Phase | Timing | What happens |
+|-------|--------|-------------|
+| `trace` | 0 → 1100ms | SVG stroke draws from left + right outer corners toward centre bump peak simultaneously |
+| `fill` | 1100ms | Blue fill floods in, "Riti Creations" label fades up |
+| `cards` | 1500ms | Category cards slide up from below (staggered 180ms per card) |
+| `footer` | 2000ms | Green footer slides up from off-screen |
+| `done` | 2500ms | Normal state — scroll, blur, all interactions enabled |
+
+**Strict Mode fix:** `introPhase` lives in `App` (persists across navigations). `HomeScreen` uses a `cancelled` closure flag in `useEffect` so React's double-invocation in development doesn't break the timers. `BlueHeader.traceGo` initialises to `true` if intro already played (back-navigation case).
+
+---
+
+## Design Tokens
 
 | Token | Value |
 |-------|-------|
 | `FONT_BOLD` | `'Season Mix-TRIAL:Bold', 'Poppins', sans-serif` |
-| `FS_HEAD` | 36px |
-| `FS_CHROME` | 16px |
-| weights | 780 Bold, 670 SemiBold (font file present) |
+| `FS_HEAD` | `36px` — screen titles and card titles |
+| `FS_CHROME` | `16px` — header, footer, all buttons |
+| `font-weight` | `780` (Bold), `670` (SemiBold) |
 
 ---
 
-## SVG / layout constants (in `App.tsx`)
+## SVG Paths
 
-`HEADER`, `HEADER_LEFT`, `HEADER_RIGHT` — blue header (bump down)  
-`FOOTER`, `FOOTER_LEFT`, `FOOTER_RIGHT` — green footer (bump up)  
-`CARD_OVERLAY`, `CARD_FRAME`  
-`WAVE_AR = 393/87.3859`
+| Constant | Description |
+|----------|-------------|
+| `WAVE` | Full wave shape — header and footer |
+| `WAVE_LEFT` | Left half-stroke for intro trace animation |
+| `WAVE_RIGHT` | Right half-stroke for intro trace animation |
+| `CARD_OVERLAY` | Gradient blur overlay on category card bottom |
+| `ORNATE` | Ornate arch shape — Screen 2 header |
+| `FLIP` | `scale(1,-1) translate(0,-87.3859)` — flips wave vertically via SVG transform (NOT CSS, to avoid breaking `backdrop-filter`) |
 
-Backdrop blur is clipped to the SVG shape via `foreignObject` + `clipPath` (`pad = 12`).
+**Aspect ratios:**
+- `WAVE_AR = 393 / 87.3859` — used for wave header/footer sizing
+- `ORNATE_AR = 393 / 211.423` — ornate header sizing
+- `ORNATE_CONTENT_RATIO = 110 / 211.423` — content starts inside arch opening
 
 ---
 
-## Content shape
+## Backdrop Blur — Critical Implementation Detail
+
+Blur is clipped to the SVG wave/ornate shape exactly, NOT to the rectangular div.
+
+**Pattern (exact Figma method):**
+```tsx
+// Inside an <svg> element:
+<foreignObject x={-pad} y={-pad} width={w + pad*2} height={h + pad*2}
+  style={{ opacity: active ? 1 : 0, transition: 'opacity 350ms ease-in-out' }}>
+  <div xmlns="http://www.w3.org/1999/xhtml"
+    style={{ backdropFilter: 'blur(6px)', clipPath: `url(#${clipId})`,
+             height: '100%', width: '100%' }} />
+</foreignObject>
+<defs>
+  <clipPath id={clipId} transform={`translate(${pad} ${pad})`}>
+    <path d={path} transform={pathTransform} />
+  </clipPath>
+</defs>
+```
+
+- `pad = 12` — foreignObject extends 12px beyond SVG bounds to avoid clipping the blur edge
+- `clipPath transform="translate(12 12)"` offsets the clip to match the pad
+- Blur activates only when `scrolled = true` (user has scrolled > 8px)
+- **Do NOT use CSS `transform: rotate(180deg)` on a parent div** — it creates an isolated compositing group that breaks `backdrop-filter`. Use the SVG `FLIP` transform on the path element instead.
+
+---
+
+## Skeleton Loading
+
+Shows while `fontsReady = false` (waiting for `document.fonts.ready`). Three shimmer layers:
+- Blue shimmer wave (top) — shape matches the real header
+- Gray shimmer cards (middle) — one per category
+- Green shimmer wave (bottom) — shape matches the real footer
+
+Skeleton is `z-50` with `pointer-events-none`. Fades out (380ms ease-in-out) when fonts are ready.
+
+---
+
+## Image & Category Database
+
+**Source of truth:** Google Drive folder (one subfolder per category).  
+**Build sync:** `npm run sync:images` (also runs automatically before `npm run build`).
+
+Pipeline: list Drive folders → download images → compress to WebP (max 1400px, quality ~82) → write `public/gallery/` + `src/data/categories.generated.ts`. Unchanged files are skipped via Drive `id` + `modifiedTime` cache in `.cache/drive-sync.json`.
+
+**Env vars:** `GOOGLE_API_KEY`, `GOOGLE_DRIVE_FOLDER_ID` (in `.env.local` locally; same names on Vercel).
 
 ```ts
 interface CategoryData {
-  id: string            // Drive folder id
-  lines: string[]       // overlay lines from folder name
+  id: string          // slug from folder name
+  lines: string[]     // title lines (≤18 chars each, from folder name)
+  cardImage: string   // first photo (same set as gallery)
   galleryTitle: string
-  photos: string[]      // Drive thumbnail URLs
+  photos: string[]    // /gallery/<slug>/<fileId>.webp
 }
 ```
 
-Site background: `src/assets/bg.png`.
+**To add images / categories:** Add folders or files in Drive, then redeploy (or run `npm run sync:images` locally).
 
 ---
 
 ## Fonts
 
-`/public/fonts/Season_Mix-TRIAL-Bold.woff2` and `SemiBold.woff2` — `@font-face` in `src/index.css`.
+**Font family:** Season Mix-TRIAL (private/custom font)
+
+Files located at `/public/fonts/`:
+- `Season_Mix-TRIAL-Bold.woff2` — weight 780
+- `Season_Mix-TRIAL-SemiBold.woff2` — weight 670
+
+Wired via `@font-face` in `src/index.css`. Families declared as:
+- `'Season Mix-TRIAL:Bold'`
+- `'Season Mix-TRIAL:SemiBold'`
 
 ---
 
-## File structure
+## File Structure
 
 ```
 src/
-  App.tsx                 — all UI
-  ShlokaIntro.tsx         — boot shloka loader
-  main.tsx
-  index.css
-  data/categories.ts      — types + localStorage cache
-  data/driveCatalogue.ts  — Drive fetch on load
-  lib/share.ts            — Web Share + media proxy
-  assets/bg.png
-  assets/placeholder.png
-  assets/intro/line1.svg, line2.svg
-public/fonts/
-api/media.js
-.env.example
-Project.md
+  App.tsx              — All UI components and screens
+  index.css            — Tailwind import, @font-face, shimmer keyframes
+  main.tsx             — React entrypoint
+  data/
+    categories.ts      — Category + photo database (edit here to manage content)
+  imports/
+    Screen1/           — Figma-generated assets (read-only)
+    Screen2-1/         — Figma-generated assets (read-only)
+public/
+  fonts/
+    Season_Mix-TRIAL-Bold.woff2
+    Season_Mix-TRIAL-SemiBold.woff2
 ```
 
 ---
 
-## Components (all in `App.tsx` unless noted)
+## Component Map
 
-| Component | Role |
-|-----------|------|
-| `App` | nav state, catalogue load, home introPhase, shloka gate |
-| `ShlokaIntro` | boot fill-letter animation (`ShlokaIntro.tsx`) |
-| `HomeScreen` / `GalleryScreen` | screens |
-| `BlueHeader` / `GreenFooter` | chrome |
-| `WaveBlur` | shape-clipped backdrop blur |
-| `CategoryCard` / `CardImageScroller` / `CardDots` / `GalleryPhoto` / `ViewAllButton` / `DriveImg` | content |
+| Component | Purpose |
+|-----------|---------|
+| `App` | Root — navigation state, introPhase state, font-ready gating, skeleton overlay |
+| `HomeScreen` | Screen 1 — manages scroll, header/footer heights, intro timing |
+| `GalleryScreen` | Screen 2 — manages scroll, Go Back visibility, content positioning |
+| `BlueHeader` | Sticky wave header with intro stroke → fill animation |
+| `GreenFooter` | Sticky wave footer — WhatsApp link |
+| `OrnateHeader` | Screen 2 arch header |
+| `WaveBlur` | SVG foreignObject backdrop blur, clipped to any path shape |
+| `CategoryCard` | Home screen category card with image, overlay, grow button |
+| `CardBlurOverlay` | Gradient + blur on card bottom third |
+| `ViewportButton` | Grows 90% → 100% width when it enters the viewport (IntersectionObserver) |
+| `PhotoTile` | Square photo tile for gallery grid |
+| `HomeSkeletonScreen` | Shimmer skeleton shown while fonts load |
+| `SkeletonWave` | Blue or green shimmer wave for skeleton |
+| `BgImage` | Full-bleed background photo (opacity 0.85) |
+| `useFontsReady` | Hook — resolves `true` after `document.fonts.ready` |
 
 ---
 
-## Behaviours
+## Key Behaviours
 
-- Header/footer blur when `scrollTop > 8` (after chrome intro settled)
-- "View all photos" fixed full width
-- First gallery photo `eager` + `fetchPriority="high"`; rest `lazy`; session `imgReady` cache
-- Home cards and gallery tiles forced **1:1** via `aspect-ratio: 1 / 1` + `object-cover`
-- Home card scroller: clone-first seamless loop; 3500ms dwell, 700ms `ease-in-out`
+- **Scroll blur** — header and footer blur their wave shape (not the rectangle) when `scrollTop > 8`.
+- **Viewport grow button** — "View all photos" expands from 90% to 100% width when it enters the viewport.
+- **Go Back pill** — appears after 40px scroll on Gallery screen; centred with a single inline `transform: translateX(-50%) translateY(...)` (no mixing Tailwind + inline transform).
+- **Image loading** — first photo per category loads `eager` + `fetchPriority="high"`; rest load `lazy`.
+- **No parallax** — removed by user request.
+- **Navigation transition** — 280ms fade + 10px slide on screen switch.
+- **Rotating CTA copy** — Home “View all photos” / “Prices starting from ₹499”; Gallery footer “DM us…” / “Customization also available” (2s hold, subtle slide-up, ease-in-out).
+- **Home end line** — “Handcrafted and made with love ❤️” at chrome font size, 40px vertical padding, opacity 75%.

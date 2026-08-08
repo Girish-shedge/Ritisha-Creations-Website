@@ -7,18 +7,28 @@ Mobile decoration showcase. Browse categories, open galleries, enquire on WhatsA
 
 ## Stack
 
-React 19 · Vite 8 · Tailwind CSS v4 · TypeScript
+React 19 · Vite 8 · Tailwind CSS v4 · TypeScript · Sharp (build-time image compress)
 
 ## Develop
 
 ```bash
 pnpm install
+pnpm sync:images   # needs .env.local — see .env.example
 pnpm dev
-pnpm build
+pnpm build         # syncs Drive images, then vite build
 ```
 
 ## Content
 
-Google Drive folder is the source of truth (fetched on each page load). Copy `.env.example` → `.env.local` and set `VITE_GOOGLE_DRIVE_API_KEY`. On Vercel, add the same env vars.
+Google Drive is the source of truth (one subfolder per category).  
+`pnpm build` / `pnpm sync:images` downloads, compresses to WebP, and writes `public/gallery/` + `src/data/categories.generated.ts`.
 
-See `Project.md` for behaviour and design notes (shloka boot, home/gallery chrome, Drive catalogue, share).
+**Env (local `.env.local` + Vercel):**
+
+- `GOOGLE_API_KEY`
+- `GOOGLE_DRIVE_FOLDER_ID`
+- `GOOGLE_API_REFERER` (if the key uses HTTP referrer restrictions)
+
+Never commit API keys. Prefer restricting the key to **Drive API only**.
+
+See `Project.md` for UI behaviour and design notes.
