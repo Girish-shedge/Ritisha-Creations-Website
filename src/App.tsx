@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId, useMemo } from 'react'
 import {
   categoryPath,
   readCatalogueCache,
@@ -434,14 +434,18 @@ function NavIconBtn({
   )
 }
 
-// Session image cache — skip placeholders for URLs already loaded this page life.
+// Session image cache — only URLs that actually decoded.
 const imgReady = new Set<string>()
+const imgFailed = new Set<string>()
 
 function warmImage(src: string) {
-  if (!src || imgReady.has(src)) return
+  if (!src || imgReady.has(src) || imgFailed.has(src)) return
   const img = new Image()
-  img.onload = () => { imgReady.add(src) }
-  img.onerror = () => { imgReady.add(src) }
+  img.onload = () => {
+    if (img.naturalWidth > 0) imgReady.add(src)
+    else imgFailed.add(src)
+  }
+  img.onerror = () => { imgFailed.add(src) }
   img.src = src
 }
 
@@ -461,30 +465,59 @@ function DriveImg({
   className?: string
   style?: React.CSSProperties
 }) {
-  const [loaded, setLoaded] = useState(() => imgReady.has(src))
+  const candidates = useMemo(() => {
+    const m = /[?&]id=([^&]+)/.exec(src)
+    const id = m?.[1] ? decodeURIComponent(m[1]) : null
+    if (!id) return [src]
+    return [
+      `/api/media?id=${encodeURIComponent(id)}`,
+      `https://lh3.googleusercontent.com/d/${id}=w1200`,
+      `https://drive.google.com/uc?export=view&id=${encodeURIComponent(id)}`,
+    ]
+  }, [src])
+
+  const [idx, setIdx] = useState(0)
+  const activeSrc = candidates[Math.min(idx, candidates.length - 1)] ?? src
+  const [loaded, setLoaded] = useState(() => imgReady.has(activeSrc))
+  const [failed, setFailed] = useState(false)
   const imgRef = useRef<HTMLImageElement>(null)
 
   useEffect(() => {
-    if (imgReady.has(src)) {
-      setLoaded(true)
-      return
-    }
-    setLoaded(false)
-  }, [src])
+    setIdx(0)
+    setLoaded(imgReady.has(candidates[0] ?? src))
+    setFailed(false)
+  }, [src, candidates, src])
 
   useEffect(() => {
     const el = imgRef.current
     if (!el) return
     if (el.complete && el.naturalWidth > 0) {
-      imgReady.add(src)
+      imgReady.add(activeSrc)
       setLoaded(true)
+      setFailed(false)
     }
-  }, [src])
+  }, [activeSrc])
 
-  const mark = () => {
-    imgReady.add(src)
+  const markOk = () => {
+    imgReady.add(activeSrc)
+    imgFailed.delete(activeSrc)
     setLoaded(true)
+    setFailed(false)
   }
+
+  const markFail = () => {
+    imgFailed.add(activeSrc)
+    imgReady.delete(activeSrc)
+    if (idx + 1 < candidates.length) {
+      setIdx((i) => i + 1)
+      setLoaded(false)
+      return
+    }
+    setLoaded(false)
+    setFailed(true)
+  }
+
+  const showPhoto = loaded && !failed
 
   return (
     <>
@@ -495,27 +528,31 @@ function DriveImg({
         className={className}
         style={{
           ...style,
-          opacity: loaded ? 0 : 1,
+          opacity: showPhoto ? 0 : 1,
           transition: 'opacity 280ms ease-in-out',
         }}
         draggable={false}
       />
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        decoding="async"
-        className={className}
-        style={{
-          ...style,
-          opacity: loaded ? 1 : 0,
-          transition: 'opacity 280ms ease-in-out',
-        }}
-        draggable={false}
-        onLoad={mark}
-      />
+      {!failed && (
+        <img
+          key={activeSrc}
+          ref={imgRef}
+          src={activeSrc}
+          alt={alt}
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : 'auto'}
+          decoding="async"
+          className={className}
+          style={{
+            ...style,
+            opacity: showPhoto ? 1 : 0,
+            transition: 'opacity 280ms ease-in-out',
+          }}
+          draggable={false}
+          onLoad={markOk}
+          onError={markFail}
+        />
+      )}
     </>
   )
 }

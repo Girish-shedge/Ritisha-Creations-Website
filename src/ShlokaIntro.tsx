@@ -7,6 +7,8 @@ const LINE_MS = 2000
 const DRAW_MS = LINE_MS * 2
 const FADE_MS = 520
 const PULSE_MS = 2200
+const AUDIO_VOL = 0.75
+const AUDIO_SRC = '/audio/shankh.mp3'
 
 type Phase = 'draw' | 'pulse' | 'fade'
 
@@ -89,6 +91,7 @@ function ShlokaLine({
  * Fill-only letter fade: line1 L→R (2s), line2 L→R (2s).
  * Then pulse until `ready` (fonts + catalogue). Cover thumbs keep loading under home.
  * Fade out → onDone.
+ * Shankh audio (~4.5s, baked fade in/out) plays at 75% during the draw.
  */
 export default function ShlokaIntro({
   ready,
@@ -99,11 +102,31 @@ export default function ShlokaIntro({
 }) {
   const line1Ref = useRef<Glyph[]>([])
   const line2Ref = useRef<Glyph[]>([])
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [phase, setPhase] = useState<Phase>('draw')
   const [overlayOpacity, setOverlayOpacity] = useState(1)
   const doneRef = useRef(false)
   const readyRef = useRef(ready)
   readyRef.current = ready
+
+  // Play cropped shankh under the 4s draw (file already faded in/out; volume 75%)
+  useEffect(() => {
+    const audio = new Audio(AUDIO_SRC)
+    audio.preload = 'auto'
+    audio.volume = AUDIO_VOL
+    audioRef.current = audio
+    const play = audio.play()
+    if (play && typeof play.catch === 'function') {
+      // Autoplay may be blocked until gesture — silent fail, animation still runs.
+      play.catch(() => {})
+    }
+    return () => {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      audioRef.current = null
+    }
+  }, [])
 
   // Draw: fixed 4s, complexity-weighted per glyph
   useEffect(() => {
@@ -139,6 +162,18 @@ export default function ShlokaIntro({
   // Fade overlay out, then hand off to home header
   useEffect(() => {
     if (phase !== 'fade' || doneRef.current) return
+    const a = audioRef.current
+    if (a && !a.paused) {
+      const startVol = a.volume
+      const t0 = performance.now()
+      const fade = (now: number) => {
+        const t = Math.min(1, (now - t0) / FADE_MS)
+        a.volume = startVol * (1 - t)
+        if (t < 1) requestAnimationFrame(fade)
+        else a.pause()
+      }
+      requestAnimationFrame(fade)
+    }
     const raf = requestAnimationFrame(() => setOverlayOpacity(0))
     const t = window.setTimeout(() => {
       doneRef.current = true

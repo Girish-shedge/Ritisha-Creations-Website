@@ -25,7 +25,10 @@ interface DriveFile {
 }
 
 export function driveThumbUrl(fileId: string, width: number) {
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${width}`
+  // Same-origin proxy — Drive thumbnail hotlinks break in production (403 / empty).
+  // width kept for API compatibility; proxy returns full file (browser caches).
+  void width
+  return `/api/media?id=${encodeURIComponent(fileId)}`
 }
 
 async function listChildren(parentId: string, extraQ: string): Promise<DriveFile[]> {

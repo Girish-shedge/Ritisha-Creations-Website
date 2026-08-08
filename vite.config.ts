@@ -1,9 +1,75 @@
-import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
+import { defineConfig, type HtmlTagDescriptor, type Plugin, type Connect } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'node:path'
+import fs from 'node:fs'
 
 import siteConfiguration from './.figma/make/site.json'
+
+function loadEnvLocal() {
+  const p = path.resolve(__dirname, '.env.local')
+  if (!fs.existsSync(p)) return
+  for (const line of fs.readFileSync(p, 'utf8').split(/\r?\n/)) {
+    if (!line || line.startsWith('#') || !line.includes('=')) continue
+    const i = line.indexOf('=')
+    const k = line.slice(0, i).trim()
+    const v = line.slice(i + 1).trim()
+    if (k && !(k in process.env)) process.env[k] = v
+  }
+}
+
+/** Local / preview stand-in for Vercel `api/media.js`. */
+function driveMediaProxy(): Plugin {
+  loadEnvLocal()
+  const handler: Connect.NextHandleFunction = async (req, res, next) => {
+    const url = req.url || ''
+    if (!url.startsWith('/api/media')) return next()
+    try {
+      const id = new URL(url, 'http://local').searchParams.get('id') || ''
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
+        res.statusCode = 400
+        res.end('Bad id')
+        return
+      }
+      const key = process.env.VITE_GOOGLE_DRIVE_API_KEY || process.env.GOOGLE_API_KEY
+      if (!key) {
+        res.statusCode = 500
+        res.end('Missing API key')
+        return
+      }
+      const referer =
+        process.env.GOOGLE_API_REFERER ||
+        process.env.VITE_GOOGLE_API_REFERER ||
+        'http://localhost:5173/'
+      const upstream = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${key}&supportsAllDrives=true`,
+        { headers: { Referer: referer } },
+      )
+      if (!upstream.ok) {
+        res.statusCode = upstream.status
+        res.end('Upstream error')
+        return
+      }
+      const type = upstream.headers.get('content-type') || 'image/jpeg'
+      const buf = Buffer.from(await upstream.arrayBuffer())
+      res.statusCode = 200
+      res.setHeader('Content-Type', type)
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+      res.end(buf)
+    } catch (err) {
+      next(err as Error)
+    }
+  }
+  return {
+    name: 'drive-media-proxy',
+    configureServer(server) {
+      server.middlewares.use(handler)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(handler)
+    },
+  }
+}
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -19,6 +85,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      driveMediaProxy(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),

@@ -22,7 +22,7 @@ export interface CategoryData {
   coverId: string
 }
 
-const CACHE_KEY = 'ritisha.driveCatalogue.v2'
+const CACHE_KEY = 'ritisha.driveCatalogue.v3'
 
 export function readCatalogueCache(): CategoryData[] | null {
   try {
