@@ -57,7 +57,7 @@ Navigation: History API paths + 280ms fade. Back → `/`.
 ## Intro
 
 ### Shloka boot (first home load)
-Two Devanagari lines (Figma `309:764`) stroke-draw in light grey `#B9B9B9`: line 1 then line 2, ease-in-out. Progress tracks Drive catalogue + cover image loads (min ~2.2s). Fades out → home header intro. Skipped on category deep links.
+Two Devanagari lines (Figma `309:764`), fill-only `#FC9C02`: glyphs fade in left→right, line 1 then line 2 (~2s each, denser glyphs get more time). After 4s, pulse 100%↔50% only until fonts + Drive catalogue are ready (cover thumbs continue under home); skip pulse if already ready. Fade out → home header intro. Skipped on category deep links.
 
 ### Home header (once per page load after shloka)
 Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  

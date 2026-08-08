@@ -987,7 +987,6 @@ export default function App() {
     () => readCatalogueCache() ?? [],
   )
   const [catalogueReady, setCatalogueReady] = useState(false)
-  const [loadProgress, setLoadProgress] = useState(0)
   const [bootDone, setBootDone] = useState(() => Boolean(pathSlug()))
   // introPhase waits until shloka finishes (unless deep-link skips boot)
   const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
@@ -999,12 +998,10 @@ export default function App() {
     const deep = Boolean(pathSlug())
 
     ;(async () => {
-      setLoadProgress(0.05)
       const { categories: next } = await loadCatalogue()
       if (cancelled) return
       setCategories(next)
       setCatalogueReady(true)
-      setLoadProgress(0.35)
 
       const slug = pathSlug()
       if (slug) {
@@ -1012,34 +1009,14 @@ export default function App() {
         if (match) setSelected(match)
       }
 
-      const covers = next
-        .map((c) => ({ cat: c, cover: c.photos.find((p) => p.id === c.coverId) ?? c.photos[0] }))
-        .filter((x): x is { cat: CategoryData; cover: CategoryPhoto } => Boolean(x.cover))
-
-      if (covers.length === 0) {
-        setLoadProgress(1)
-        return
+      // Warm covers in the background; don't block shloka/home on them
+      for (const c of next) {
+        prefetchCategoryShare(c)
+        const cover = c.photos.find((p) => p.id === c.coverId) ?? c.photos[0]
+        if (!cover) continue
+        const img = new Image()
+        img.src = cover.thumb
       }
-
-      let done = 0
-      await Promise.all(
-        covers.map(
-          ({ cat, cover }) =>
-            new Promise<void>((resolve) => {
-              prefetchCategoryShare(cat)
-              const img = new Image()
-              const mark = () => {
-                done += 1
-                if (!cancelled) setLoadProgress(0.35 + 0.65 * (done / covers.length))
-                resolve()
-              }
-              img.onload = mark
-              img.onerror = mark
-              img.src = cover.thumb
-            }),
-        ),
-      )
-      if (!cancelled) setLoadProgress(1)
     })()
 
     if (deep) {
@@ -1095,7 +1072,7 @@ export default function App() {
     <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
       <div className="relative w-full max-w-[480px] h-[100dvh]">
         {showShloka && (
-          <ShlokaIntro loadProgress={fontsReady ? loadProgress : Math.min(loadProgress, 0.2)} onDone={onShlokaDone} />
+          <ShlokaIntro ready={fontsReady && catalogueReady} onDone={onShlokaDone} />
         )}
         <div className="absolute inset-0"
           style={{

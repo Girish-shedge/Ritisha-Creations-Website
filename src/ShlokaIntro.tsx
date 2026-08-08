@@ -2,10 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import line1Svg from '@/assets/intro/line1.svg?raw'
 import line2Svg from '@/assets/intro/line2.svg?raw'
 
-const STROKE = '#B9B9B9'
-const MIN_DRAW_MS = 2200
-const FADE_MS = 480
-const LINE1_END = 0.52
+const FILL = '#FC9C02'
+const LINE_MS = 2000
+const DRAW_MS = LINE_MS * 2
+const FADE_MS = 520
+const PULSE_MS = 700
+
+type Phase = 'draw' | 'pulse' | 'fade'
 
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
@@ -13,92 +16,64 @@ function easeInOut(t: number) {
 
 function prepareSvg(raw: string) {
   return raw
-    .replace(/fill="[^"]*"/g, 'fill="none"')
     .replace(/stroke="[^"]*"/g, '')
-    .replace(/<path\b/g, `<path fill="none" stroke="${STROKE}" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.35"`)
+    .replace(/fill="[^"]*"/g, `fill="${FILL}"`)
 }
 
-/** visualProgress follows loadProgress but never finishes faster than MIN_DRAW_MS. */
-function useDrawProgress(loadProgress: number) {
-  const [visual, setVisual] = useState(0)
-  const visualRef = useRef(0)
-  const lastRef = useRef(performance.now())
+type Glyph = { el: SVGPathElement; weight: number }
 
-  useEffect(() => {
-    let raf = 0
-    const tick = (now: number) => {
-      const dt = Math.min(64, now - lastRef.current)
-      lastRef.current = now
-      const maxStep = dt / MIN_DRAW_MS
-      let v = visualRef.current
-      if (loadProgress < 1) {
-        // Ceiling = real load; creep at most maxStep (so instant load still takes MIN_DRAW_MS)
-        v = Math.min(loadProgress, v + maxStep)
-      } else {
-        v = Math.min(1, v + maxStep)
-      }
-      visualRef.current = v
-      setVisual(v)
-      if (v < 1 || loadProgress < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [loadProgress])
+/** Left→right paths with complexity weights (path length). */
+function prepLine(host: HTMLDivElement, raw: string): Glyph[] {
+  host.innerHTML = prepareSvg(raw)
+  const svg = host.querySelector('svg')
+  if (!svg) return []
+  svg.setAttribute('width', '100%')
+  svg.setAttribute('height', '100%')
+  svg.style.display = 'block'
+  svg.style.overflow = 'visible'
 
-  return visual
+  const paths = [...svg.querySelectorAll('path')]
+  paths.sort((a, b) => a.getBBox().x - b.getBBox().x)
+
+  return paths.map((el) => {
+    let weight = 40
+    try { weight = Math.max(24, el.getTotalLength()) }
+    catch { /* keep floor */ }
+    el.style.fill = FILL
+    el.style.stroke = 'none'
+    el.style.opacity = '0'
+    return { el, weight }
+  })
+}
+
+function paintLine(glyphs: Glyph[], localT: number) {
+  const total = glyphs.reduce((s, g) => s + g.weight, 0) || 1
+  let cursor = 0
+  for (const g of glyphs) {
+    const start = cursor / total
+    const end = (cursor + g.weight) / total
+    cursor += g.weight
+    const local = Math.max(0, Math.min(1, (localT - start) / (end - start || 1)))
+    g.el.style.opacity = String(easeInOut(local))
+  }
 }
 
 function ShlokaLine({
-  raw, progress, width, height,
+  raw, glyphsRef, width, height,
 }: {
   raw: string
-  progress: number // 0–1 for this line
+  glyphsRef: React.MutableRefObject<Glyph[]>
   width: number
   height: number
 }) {
   const host = useRef<HTMLDivElement>(null)
-  const lengths = useRef<number[]>([])
 
   useLayoutEffect(() => {
     const root = host.current
     if (!root) return
-    root.innerHTML = prepareSvg(raw)
-    const svg = root.querySelector('svg')
-    if (!svg) return
-    svg.setAttribute('width', '100%')
-    svg.setAttribute('height', '100%')
-    svg.style.display = 'block'
-    svg.style.overflow = 'visible'
-    const paths = [...svg.querySelectorAll('path')]
-    lengths.current = paths.map((p) => {
-      try { return p.getTotalLength() }
-      catch { return 100 }
-    })
-    paths.forEach((p, i) => {
-      const len = lengths.current[i] || 100
-      p.style.strokeDasharray = `${len}`
-      p.style.strokeDashoffset = `${len}`
-      p.style.fill = 'none'
-      p.style.stroke = STROKE
-    })
-  }, [raw])
-
-  useLayoutEffect(() => {
-    const root = host.current
-    if (!root) return
-    const paths = [...root.querySelectorAll('path')]
-    const n = paths.length || 1
-    const p = easeInOut(Math.max(0, Math.min(1, progress)))
-    paths.forEach((el, i) => {
-      const len = lengths.current[i] || 100
-      const start = i / n
-      const end = (i + 1) / n
-      const local = Math.max(0, Math.min(1, (p - start) / (end - start)))
-      el.style.strokeDashoffset = `${len * (1 - local)}`
-      el.style.fill = local >= 1 ? STROKE : 'none'
-      el.style.transition = 'none'
-    })
-  }, [progress])
+    glyphsRef.current = prepLine(root, raw)
+    return () => { glyphsRef.current = [] }
+  }, [raw, glyphsRef])
 
   return (
     <div
@@ -111,46 +86,97 @@ function ShlokaLine({
 }
 
 /**
- * Full-screen shloka loader. `loadProgress` 0–1 from catalogue + cover images.
- * Calls onDone after draw completes and fade-out.
+ * Fill-only letter fade: line1 L→R (2s), line2 L→R (2s).
+ * Then pulse until `ready` (fonts + catalogue). Cover thumbs keep loading under home.
+ * Fade out → onDone.
  */
 export default function ShlokaIntro({
-  loadProgress,
+  ready,
   onDone,
 }: {
-  loadProgress: number
+  ready: boolean
   onDone: () => void
 }) {
-  const visual = useDrawProgress(loadProgress)
-  const [fading, setFading] = useState(false)
+  const line1Ref = useRef<Glyph[]>([])
+  const line2Ref = useRef<Glyph[]>([])
+  const [phase, setPhase] = useState<Phase>('draw')
+  const [overlayOpacity, setOverlayOpacity] = useState(1)
   const doneRef = useRef(false)
+  const readyRef = useRef(ready)
+  readyRef.current = ready
 
-  const line1 = Math.max(0, Math.min(1, visual / LINE1_END))
-  const line2 = visual <= LINE1_END ? 0 : Math.max(0, Math.min(1, (visual - LINE1_END) / (1 - LINE1_END)))
-
+  // Draw: fixed 4s, complexity-weighted per glyph
   useEffect(() => {
-    if (doneRef.current) return
-    if (visual < 1 || loadProgress < 1) return
-    doneRef.current = true
-    setFading(true)
-    const t = window.setTimeout(onDone, FADE_MS)
-    return () => clearTimeout(t)
-  }, [visual, loadProgress, onDone])
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const elapsed = now - t0
+      if (elapsed < LINE_MS) {
+        paintLine(line1Ref.current, elapsed / LINE_MS)
+        paintLine(line2Ref.current, 0)
+      } else if (elapsed < DRAW_MS) {
+        paintLine(line1Ref.current, 1)
+        paintLine(line2Ref.current, (elapsed - LINE_MS) / LINE_MS)
+      } else {
+        paintLine(line1Ref.current, 1)
+        paintLine(line2Ref.current, 1)
+        setPhase(readyRef.current ? 'fade' : 'pulse')
+        return
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  // Pulse → fade when catalogue + fonts are ready
+  useEffect(() => {
+    if (phase !== 'pulse') return
+    if (!ready) return
+    setPhase('fade')
+  }, [phase, ready])
+
+  // Fade overlay out, then hand off to home header
+  useEffect(() => {
+    if (phase !== 'fade' || doneRef.current) return
+    const raf = requestAnimationFrame(() => setOverlayOpacity(0))
+    const t = window.setTimeout(() => {
+      doneRef.current = true
+      onDone()
+    }, FADE_MS)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(t)
+    }
+  }, [phase, onDone])
 
   return (
     <div
       className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white px-4"
       style={{
-        opacity: fading ? 0 : 1,
+        opacity: overlayOpacity,
         transition: `opacity ${FADE_MS}ms ease-in-out`,
-        pointerEvents: fading ? 'none' : 'auto',
+        pointerEvents: phase === 'fade' ? 'none' : 'auto',
       }}
       role="status"
       aria-label="Loading"
     >
-      <div className="flex flex-col items-center w-full" style={{ gap: 4, maxWidth: 360 }}>
-        <ShlokaLine raw={line1Svg} progress={line1} width={353.268} height={37.055} />
-        <ShlokaLine raw={line2Svg} progress={line2} width={345.129} height={38.285} />
+      <style>{`
+        @keyframes shloka-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
+      <div
+        className="flex flex-col items-center w-full"
+        style={{
+          gap: 4,
+          maxWidth: 360,
+          animation: phase === 'pulse' ? `shloka-pulse ${PULSE_MS}ms ease-in-out infinite` : undefined,
+        }}
+      >
+        <ShlokaLine raw={line1Svg} glyphsRef={line1Ref} width={353.268} height={37.055} />
+        <ShlokaLine raw={line2Svg} glyphsRef={line2Ref} width={345.129} height={38.285} />
       </div>
     </div>
   )
