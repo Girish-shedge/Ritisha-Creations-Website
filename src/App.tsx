@@ -281,18 +281,25 @@ const ROTATE_NUDGE = '28%'
 function RotatingLines({
   lines,
   style,
+  active = true,
 }: {
   lines: string[]
   style?: React.CSSProperties
+  /** When false, show first line only (no rotation). */
+  active?: boolean
 }) {
   const [idx, setIdx] = useState(0)
   const [sliding, setSliding] = useState(false)
 
   useEffect(() => {
-    if (lines.length < 2) return
+    if (!active || lines.length < 2) {
+      setSliding(false)
+      setIdx(0)
+      return
+    }
     const hold = setInterval(() => setSliding(true), ROTATE_HOLD_MS)
     return () => clearInterval(hold)
-  }, [lines.length])
+  }, [active, lines.length])
 
   useEffect(() => {
     if (!sliding) return
@@ -858,6 +865,7 @@ function CategoryCard({
       >
         <RotatingLines
           lines={['View all photos', 'Prices starting from ₹499']}
+          active={armed}
           style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}
         />
       </ViewAllButton>

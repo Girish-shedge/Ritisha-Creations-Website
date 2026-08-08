@@ -38,9 +38,9 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 ### Home
 - Sticky blue wave header — "Rittisha Creations" (stroke → fill → text intro once per load)
 - Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together
-- **"View all photos"** fixed full-width button opens gallery (card image is not a tap target)
+- **"View all photos"** fixed full-width button — rotates with **“Prices starting from ₹499”** only after the card has been in view **≥1s** (same arming as image autoplay); opens gallery (card image is not a tap target)
 - Simple vertical list (no scroll scale/opacity)
-- End tagline: “handcrafted and made with love ❤️” (`FS_CHROME`, **40px** top + bottom)
+- End tagline: “Handcrafted and made with love ❤️” (`FS_CHROME`, **40px** top + bottom, **75%** opacity)
 - Site `bg.png` at **75%** opacity
 - No green WhatsApp footer on Home
 
@@ -49,7 +49,7 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 - Share: `Hey, check out this amazing piece by *Rittisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
 - Edge-to-edge **1:1** photos, **16px** gap (flush under overlay nav + footer); session image cache skips placeholders on revisit
 - Footer chrome intro (stroke → fill → text) each open; images warm in parallel
-- Sticky green footer — "DM us for more information"
+- Sticky green footer — rotates **“DM us for more information”** ↔ **“Customization also available”** (same slide-up text animation as home buttons)
 - Site `bg.png` at **75%** opacity
 
 Navigation: History API paths + 280ms fade. Back → `/`.
@@ -59,7 +59,7 @@ Navigation: History API paths + 280ms fade. Back → `/`.
 ## Intro
 
 ### Shloka boot (first home load)
-Two Devanagari lines (Figma `309:764`), fill-only `#FC9C02`: glyphs fade in left→right, line 1 then line 2 (~2s each, denser glyphs get more time). After 4s, slow pulse 100%↔50% (~2.2s cycle) until fonts + Drive catalogue are ready; skip pulse if already ready. Fade out → mount home (so header stroke→fill→text runs from the start). Skipped on category deep links.
+Two Devanagari lines (Figma `309:764`), fill-only `#FC9C02`: glyphs fade in left→right, line 1 then line 2 (~2s each, denser glyphs get more time). After 4s, slow pulse 100%↔50% (~2.2s cycle) until fonts + Drive catalogue are ready; skip pulse if already ready. Fade out → mount home (so header stroke→fill→text runs from the start). Skipped on category deep links. Plays cropped **shankh** (`/audio/shankh.mp3`, ~4.5s, fade in/out, volume **75%**); if the browser blocks autoplay, first tap unlocks sound.
 
 ### Home header (once per page load after shloka)
 Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  
@@ -151,7 +151,7 @@ Project.md
 ## Behaviours
 
 - Header/footer blur when `scrollTop > 8` (after chrome intro settled)
-- "View all photos" fixed full width
+- "View all photos" fixed full width; CTA text rotation arms with card (≥1s in view)
 - First gallery photo `eager` + `fetchPriority="high"`; rest `lazy`; session `imgReady` cache
 - Home cards and gallery tiles forced **1:1** via `aspect-ratio: 1 / 1` + `object-cover`
 - Home card scroller: clone-first seamless loop; 3500ms dwell, 700ms `ease-in-out`
