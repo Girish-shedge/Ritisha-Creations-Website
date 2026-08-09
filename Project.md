@@ -51,10 +51,11 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
 - Circular back / share; truncated white title
 - Share copy + category URL; Image 1 prefetched
-- Edge-to-edge **1:1** photos, **16px** gap; no top/bottom list padding (only `paddingBottom` = measured wave footer so the last photo clears the sticky CTA)
+- Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
 - **Green footer must always be present** on every catalog detail open — **explicit px height** (`max(72, colW/WAVE_AR)`); do not rely on `aspect-ratio` + `%` height (collapses on some iOS WebViews)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
-- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader); CSS gradient fallback behind SVG
+- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
+- After fill, footer keeps the **frosted green** look immediately (blur + 0.75) — do not wait for list scroll
 - After intro + **0.5s**, rotates **DM us for more information** ↔ **Customization also available**
 - Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)` — no solid green pad under the CTA
 
@@ -76,7 +77,7 @@ Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow)
 - `onDone` starts home header; `onGone` unmounts overlay.
 
 ### Home header — after shloka
-`introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay when returning from gallery (`settleInstant`).
+`introPhase`: `wait` → `trace` → `cards` (at **60%** of header chrome) → `done`. Does not replay when returning from gallery (`settleInstant`). Back-from-gallery scroll restore uses **ease-in-out** (~900ms), not an instant jump.
 
 ### Gallery footer — each category open
 Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill → text via `useChromeIntro({ skipMarks: true })`. Explicit wave height (not aspect-ratio shell).

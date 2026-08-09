@@ -92,7 +92,33 @@ const T_TRACE_DUR = 1100
 const T_FILL_DUR  = 550
 const T_MARK_DUR  = 420   // swastiks fade in at center
 const T_TEXT_DUR  = 550   // swastiks split + title reveal
-const T_CARDS_GAP = 900   // after header text, then enable scroll
+const T_HEADER_INTRO = T_TRACE_DUR + T_FILL_DUR + T_MARK_DUR + T_TEXT_DUR
+/** Slide home cards in when header chrome is ~60% through. */
+const T_CARDS_AT = Math.round(T_HEADER_INTRO * 0.6)
+const T_CARDS_GAP = 900   // after cards start, then enable scroll
+const SCROLL_RESTORE_MS = 900
+
+function easeInOut(t: number) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+}
+
+/** Animate scrollTop with ease-in-out (returns cancel). */
+function animateScrollTop(el: HTMLElement, to: number, ms: number) {
+  const from = el.scrollTop
+  if (Math.abs(to - from) < 1) {
+    el.scrollTop = to
+    return () => {}
+  }
+  const t0 = performance.now()
+  let raf = 0
+  const tick = (now: number) => {
+    const u = easeInOut(Math.min(1, (now - t0) / ms))
+    el.scrollTop = from + (to - from) * u
+    if (u < 1) raf = requestAnimationFrame(tick)
+  }
+  raf = requestAnimationFrame(tick)
+  return () => cancelAnimationFrame(raf)
+}
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -489,10 +515,9 @@ function RotatingLines({
 
 // ── Green sticky footer ───────────────────────────────────────
 function GreenFooter({
-  label, scrolled, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true, shellWidth,
+  label, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true, shellWidth,
 }: {
   label: string | string[]
-  scrolled: boolean
   href: string
   playIntro?: boolean
   onIntroComplete?: () => void
@@ -518,8 +543,9 @@ function GreenFooter({
     duration: T_TRACE_DUR,
   })
 
-  // Same rule as BlueHeader — once filled, stay visible (iOS was leaving fillOpacity at 0)
+  // Once filled, keep the frosted green look — don't wait for the user to scroll
   const fillOn = showFill || locked || settled
+  const frosted = fillOn
 
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
@@ -537,12 +563,12 @@ function GreenFooter({
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none"
           style={{ display: 'block' }}>
-          {(settled || locked) && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
+          {frosted && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active />}
           <path
             d={FOOTER}
             fill={`url(#${uid}_grad)`}
             style={{
-              fillOpacity: fillOn ? (scrolled && settled ? 0.75 : 1) : 0,
+              fillOpacity: fillOn ? (frosted ? 0.75 : 1) : 0,
               transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
             }}
           />
@@ -1195,8 +1221,16 @@ function HomeScreen({
   }, [introPhase])
 
   const onHeaderIntroComplete = useCallback(() => {
+    // Fallback if the 60% timer already promoted to cards
     setIntroPhase('cards')
   }, [setIntroPhase])
+
+  // Start card slide-in at 60% of the header chrome timeline (not after it finishes)
+  useEffect(() => {
+    if (introPhase !== 'trace') return
+    const t = window.setTimeout(() => setIntroPhase('cards'), T_CARDS_AT)
+    return () => clearTimeout(t)
+  }, [introPhase, setIntroPhase])
 
   useEffect(() => {
     if (introPhase !== 'cards') return
@@ -1213,16 +1247,24 @@ function HomeScreen({
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  // Restore scroll once when returning from gallery (same session)
-  useLayoutEffect(() => {
+  // Smooth ease-in-out scroll restore when returning from gallery
+  useEffect(() => {
     if (restoredRef.current) return
     if (restoreScrollTop == null || restoreScrollTop <= 0) return
     if (introPhase !== 'done') return
     const el = scrollerRef.current
     if (!el) return
-    el.scrollTop = restoreScrollTop
-    setScrolled(restoreScrollTop > 8)
     restoredRef.current = true
+    el.scrollTop = 0
+    setScrolled(false)
+    const cancel = animateScrollTop(el, restoreScrollTop, SCROLL_RESTORE_MS)
+    const end = window.setTimeout(() => {
+      setScrolled(restoreScrollTop > 8)
+    }, SCROLL_RESTORE_MS)
+    return () => {
+      cancel()
+      clearTimeout(end)
+    }
   }, [restoreScrollTop, introPhase])
 
   const cardsVisible = introPhase === 'cards' || introPhase === 'done'
@@ -1344,34 +1386,14 @@ function GalleryScreen({ category, onBack, shellWidth }: {
   onBack: () => void
   shellWidth: number
 }) {
-  const footerRef = useRef<HTMLDivElement>(null)
-  const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
   const [rotateReady, setRotateReady] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
-  const [footerH, setFooterH] = useState(() =>
-    Math.max(72, shellWidth / WAVE_AR))
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      // Prefer measured footer; fall back so scroll padding exists before paint
-      const h = footerRef.current?.offsetHeight
-      setFooterH(h && h > 0 ? h : Math.max(72, shellWidth / WAVE_AR))
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    window.visualViewport?.addEventListener('resize', measure)
-    return () => {
-      window.removeEventListener('resize', measure)
-      window.visualViewport?.removeEventListener('resize', measure)
-    }
-  }, [category.id, footerReady, shellWidth])
 
   // Nav intro after paint; warm gallery images into session cache
   useEffect(() => {
-    setScrolled(false)
     setFooterReady(false)
     setRotateReady(false)
     setNavIn(false)
@@ -1458,16 +1480,11 @@ function GalleryScreen({ category, onBack, shellWidth }: {
           src={iconShare}
         />
       </GalleryNavChrome>
-      <div
-        className="absolute inset-0 z-10 overflow-y-auto"
-        onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
-      >
+      <div className="absolute inset-0 z-10 overflow-y-auto">
         <div
           className="flex flex-col"
           style={{
             gap: 16,
-            // Clear sticky footer without extra top/bottom list padding
-            paddingBottom: footerH,
             opacity: showPhotos ? 1 : 0,
             transition: 'opacity 480ms ease-in-out',
           }}
@@ -1484,7 +1501,6 @@ function GalleryScreen({ category, onBack, shellWidth }: {
       </div>
       {/* Fixed to the visible viewport bottom — survives 100vh / WebView chrome bugs */}
       <div
-        ref={footerRef}
         className="pointer-events-none"
         style={{
           position: 'fixed',
@@ -1500,7 +1516,6 @@ function GalleryScreen({ category, onBack, shellWidth }: {
           <GreenFooter
             key={category.id}
             label={['DM us for more information', 'Customization also available']}
-            scrolled={footerReady ? scrolled : false}
             href={waUrl(waCategoryMsg(category.galleryTitle))}
             playIntro
             onIntroComplete={() => setFooterReady(true)}
