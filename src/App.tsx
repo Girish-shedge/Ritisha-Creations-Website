@@ -461,12 +461,10 @@ function GreenFooter({
   rotateActive?: boolean
 }) {
   const uid = useId().replace(/:/g, '')
-  const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
+  const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing, locked } =
     useChromeIntro(playIntro, onIntroComplete, { skipMarks: true })
   const labels = Array.isArray(label) ? label : [label]
   const aria = labels.join(' — ')
-  // Explicit px height — aspect-ratio alone collapses on some iOS WebViews
-  const footerH = Math.min(typeof window !== 'undefined' ? window.innerWidth : 393, 480) / WAVE_AR
 
   const stroke = strokeDrawProps({
     color: '#4CED77',
@@ -475,30 +473,25 @@ function GreenFooter({
     duration: T_TRACE_DUR,
   })
 
+  // Same rule as BlueHeader — once filled, stay visible (iOS was leaving fillOpacity at 0)
+  const fillOn = showFill || locked || settled
+
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className="pointer-events-auto block active:opacity-75" aria-label={aria}
-      style={{
-        visibility: visible ? 'visible' : 'hidden',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-      }}>
-      <div
-        className="relative w-full"
-        style={{
-          height: footerH,
-          minHeight: 72,
-          // Fallback so the CTA never disappears if SVG fill fails mid-animation
-          background: showFill ? 'linear-gradient(to top, #4CED77, #6CEB3E)' : 'transparent',
-        }}
-      >
+      className="pointer-events-auto block size-full active:opacity-75" aria-label={aria}
+      style={{ visibility: visible ? 'visible' : 'hidden' }}>
+      <div className="relative w-full h-full">
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-          {settled && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
-          <path d={FOOTER} fill={`url(#${uid}_grad)`}
+          {(settled || locked) && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
+          <path
+            d={FOOTER}
+            fill={`url(#${uid}_grad)`}
             style={{
-              fillOpacity: showFill ? (settled && scrolled ? 0.75 : 1) : 0,
+              fillOpacity: fillOn ? (scrolled && settled ? 0.75 : 1) : 0,
               transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
-            }} />
+            }}
+          />
           <path d={FOOTER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
           <path d={FOOTER_RIGHT} {...stroke} />
           <defs>
@@ -510,9 +503,8 @@ function GreenFooter({
         <span
           className="absolute left-0 right-0 z-10 pointer-events-none px-3 text-center"
           style={{
-            // Thick green band sits in the lower half (wave peak is at the top of the SVG)
-            bottom: '26%',
-            transform: `translateY(50%) translateY(${showText ? 0 : 6}px)`,
+            bottom: '40%',
+            transform: `translateY(50%) translateY(${showText ? 0 : 8}px)`,
             opacity: showText ? 1 : 0,
             transition: `opacity ${T_TEXT_DUR}ms ease-in-out, transform ${T_TEXT_DUR}ms ease-in-out`,
           }}
@@ -524,10 +516,8 @@ function GreenFooter({
               fontFamily: FONT_BOLD,
               fontWeight: 780,
               fontSize: FS_CHROME,
-              lineHeight: 1.35,
-              color: '#041a08',
-              WebkitTextFillColor: '#041a08',
-              textShadow: '0 0 1px rgba(4,26,8,0.35)',
+              lineHeight: 1.4,
+              color: '#0d2b08',
             }}
           />
         </span>
@@ -1304,7 +1294,6 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   const [sharing, setSharing] = useState(false)
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
-  const [playFooter, setPlayFooter] = useState(false)
   const [footerH, setFooterH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
@@ -1317,16 +1306,15 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
     measure()
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
-  }, [playFooter])
+  }, [category.id, footerReady])
 
-  // Nav + footer intro after paint; warm gallery images into session cache
+  // Nav intro after paint; warm gallery images into session cache
   useEffect(() => {
     setScrolled(false)
     setFooterReady(false)
     setRotateReady(false)
     setNavIn(false)
     setShowPhotos(false)
-    setPlayFooter(false)
 
     prefetchCategoryShare(category)
     warmCategoryImages(category)
@@ -1338,7 +1326,6 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
         if (cancelled) return
         setNavIn(true)
         setShowPhotos(true)
-        setPlayFooter(true)
       })
     })
     return () => {
@@ -1387,19 +1374,6 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
-      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-40" style={{ isolation: 'isolate' }}>
-        {playFooter && (
-          <GreenFooter
-            key={category.id}
-            label={['DM us for more information', 'Customization also available']}
-            scrolled={footerReady ? scrolled : false}
-            href={waUrl(waCategoryMsg(category.galleryTitle))}
-            playIntro
-            onIntroComplete={() => setFooterReady(true)}
-            rotateActive={rotateReady}
-          />
-        )}
-      </div>
       <GalleryNavChrome visible={navIn}>
         <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
         <h1
@@ -1445,6 +1419,26 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
             />
           ))}
         </div>
+      </div>
+      {/* After scroll in DOM + high z — same aspect shell as BlueHeader on home */}
+      <div
+        ref={footerRef}
+        className="absolute bottom-0 left-0 right-0 z-50"
+        style={{
+          aspectRatio: `${WAVE_AR}`,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          boxSizing: 'content-box',
+        }}
+      >
+        <GreenFooter
+          key={category.id}
+          label={['DM us for more information', 'Customization also available']}
+          scrolled={footerReady ? scrolled : false}
+          href={waUrl(waCategoryMsg(category.galleryTitle))}
+          playIntro
+          onIntroComplete={() => setFooterReady(true)}
+          rotateActive={rotateReady}
+        />
       </div>
     </div>
   )

@@ -4,7 +4,7 @@
  * Phase order: borders → plaque (slate) → Om → dividers → letter reveal → hold → exit.
  * - Borders pinned to the visual viewport (iOS-safe px slide, not % + scaleY).
  * - Plaque + text on a 393×800 stage scaled with min(vw, vh).
- * - Letters use SVG feDropShadow (CSS filter on <path> fails on iOS Chrome/Safari).
+ * - Letters: CSS drop-shadow on each glyph + host (glow peaks mid-reveal).
  * - onDone fires when exit starts (kick home header); onGone when fully faded.
  * - ?loop=1 on the URL replays forever for design review.
  */
@@ -32,6 +32,9 @@ const LOOP_GAP_MS = 400
 const OM_SPIN_S = 40
 const OM_OPACITY = 0.32
 
+/** Steady letter drop-shadow (glow layered on top while appearing). */
+const LETTER_SHADOW = 'drop-shadow(0px 1.5px 2px rgba(48, 30, 21, 0.55))'
+
 const DESIGN_W = 393
 const DESIGN_H = 800
 
@@ -48,6 +51,7 @@ function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
 
+/** 0→1→0 ease for appear-glow (peaks mid-reveal, then fades out). */
 function glowEnvelope(local: number) {
   return Math.sin(Math.max(0, Math.min(1, local)) * Math.PI)
 }
@@ -61,23 +65,9 @@ function prepareSvg(raw: string) {
     .replace(/fill-opacity="[^"]*"/g, 'fill-opacity="0.9"')
 }
 
-/** SVG filters — CSS drop-shadow on <path> is ignored on many iOS browsers. */
-const FILTER_DEFS = (uid: string) => `
-<defs>
-  <filter id="${uid}-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
-    <feDropShadow dx="0" dy="2.5" stdDeviation="2" flood-color="#1a0f0a" flood-opacity="0.9"/>
-  </filter>
-  <filter id="${uid}-glow" x="-120%" y="-120%" width="340%" height="340%" color-interpolation-filters="sRGB">
-    <feDropShadow dx="0" dy="0" stdDeviation="1.8" flood-color="#FFFFFF" flood-opacity="1"/>
-    <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#FFE8D0" flood-opacity="1"/>
-    <feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="#DFCBC1" flood-opacity="0.85"/>
-    <feDropShadow dx="0" dy="2.5" stdDeviation="2" flood-color="#1a0f0a" flood-opacity="0.9"/>
-  </filter>
-</defs>`
+type Glyph = { el: SVGPathElement; weight: number }
 
-type Glyph = { el: SVGPathElement; weight: number; shadow: string; glow: string }
-
-function prepLine(host: HTMLDivElement, raw: string, uid: string): Glyph[] {
+function prepLine(host: HTMLDivElement, raw: string): Glyph[] {
   host.innerHTML = prepareSvg(raw)
   const svg = host.querySelector('svg')
   if (!svg) return []
@@ -86,12 +76,9 @@ function prepLine(host: HTMLDivElement, raw: string, uid: string): Glyph[] {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   svg.style.display = 'block'
   svg.style.overflow = 'visible'
-  if (!svg.querySelector('defs')) {
-    svg.insertAdjacentHTML('afterbegin', FILTER_DEFS(uid))
-  }
+  // Host-level shadow so iOS still sees drop-shadow when path filters are ignored
+  host.style.filter = LETTER_SHADOW
 
-  const shadow = `url(#${uid}-shadow)`
-  const glow = `url(#${uid}-glow)`
   const paths = [...svg.querySelectorAll('path')]
   paths.sort((a, b) => {
     try { return a.getBBox().x - b.getBBox().x }
@@ -105,9 +92,9 @@ function prepLine(host: HTMLDivElement, raw: string, uid: string): Glyph[] {
     el.style.fill = FILL
     el.style.stroke = 'none'
     el.style.opacity = '0'
-    el.style.filter = 'none'
-    el.setAttribute('filter', shadow)
-    return { el, weight, shadow, glow }
+    el.style.filter = LETTER_SHADOW
+    el.removeAttribute('filter')
+    return { el, weight }
   })
 }
 
@@ -115,6 +102,7 @@ function paintLine(glyphs: Glyph[], localT: number) {
   const t = easeInOut(Math.max(0, Math.min(1, localT)))
   const total = glyphs.reduce((s, g) => s + g.weight, 0) || 1
   let cursor = 0
+  let maxGlow = 0
   for (const g of glyphs) {
     const start = cursor / total
     const end = (cursor + g.weight) / total
@@ -122,8 +110,35 @@ function paintLine(glyphs: Glyph[], localT: number) {
     const local = Math.max(0, Math.min(1, (t - start) / (end - start || 1)))
     const appear = easeInOut(local)
     g.el.style.opacity = String(appear)
-    const glowAmt = glowEnvelope(local) * appear
-    g.el.setAttribute('filter', glowAmt > 0.08 ? g.glow : g.shadow)
+
+    const glow = glowEnvelope(local) * appear
+    maxGlow = Math.max(maxGlow, glow)
+    if (glow > 0.02) {
+      const blur = 2 + glow * 6
+      const soft = 6 + glow * 10
+      g.el.style.filter = [
+        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.95 * glow}))`,
+        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.55 * glow}))`,
+        LETTER_SHADOW,
+      ].join(' ')
+    } else {
+      g.el.style.filter = LETTER_SHADOW
+    }
+  }
+
+  const host = glyphs[0]?.el.closest('div')
+  if (host instanceof HTMLElement) {
+    if (maxGlow > 0.02) {
+      const blur = 2 + maxGlow * 6
+      const soft = 6 + maxGlow * 10
+      host.style.filter = [
+        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.95 * maxGlow}))`,
+        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.55 * maxGlow}))`,
+        LETTER_SHADOW,
+      ].join(' ')
+    } else {
+      host.style.filter = LETTER_SHADOW
+    }
   }
 }
 
@@ -131,8 +146,10 @@ function clearLines(refs: React.MutableRefObject<Glyph[]>[]) {
   for (const r of refs) {
     for (const g of r.current) {
       g.el.style.opacity = '0'
-      g.el.setAttribute('filter', g.shadow)
+      g.el.style.filter = LETTER_SHADOW
     }
+    const host = r.current[0]?.el.closest('div')
+    if (host instanceof HTMLElement) host.style.filter = LETTER_SHADOW
   }
 }
 
@@ -151,9 +168,9 @@ function ShlokaLine({
   useLayoutEffect(() => {
     const root = host.current
     if (!root) return
-    glyphsRef.current = prepLine(root, raw, name)
+    glyphsRef.current = prepLine(root, raw)
     return () => { glyphsRef.current = [] }
-  }, [raw, glyphsRef, name])
+  }, [raw, glyphsRef])
 
   const [t, r, b, l] = inset ?? [0, 0, 0, 0]
 
@@ -571,11 +588,6 @@ export default function ShlokaIntro({
                 className="absolute inset-0 flex flex-col items-center justify-center overflow-visible"
                 data-name="shlokaText"
                 style={{
-                  // CSS drop-shadow survives iOS Chrome/Safari where SVG feDropShadow often doesn't paint
-                  filter:
-                    textOpacity > 0.05
-                      ? 'drop-shadow(0px 2.5px 2px rgba(26,15,10,0.88)) drop-shadow(0px 0px 3px rgba(255,255,255,0.95)) drop-shadow(0px 0px 8px rgba(255,232,208,0.9)) drop-shadow(0px 0px 14px rgba(223,203,193,0.75))'
-                      : undefined,
                   padding: '22% 12%',
                   gap: 6,
                   opacity: textOpacity,
