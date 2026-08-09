@@ -21,6 +21,19 @@
   src: url('/fonts/Season_Mix-TRIAL-SemiBold.woff2') format('woff2');
 }
 
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 /* Skeleton shimmer */
 @keyframes shimmer {
   0%   { background-position: -800px 0; }

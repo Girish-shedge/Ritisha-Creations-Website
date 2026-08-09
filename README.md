@@ -29,6 +29,6 @@ Copy `.env.example` → `.env.local` and set:
 On Vercel, set the same env vars for Production / Preview.
 
 Photos load via Googleusercontent CDN (`lh3`); placeholder shows until each image is ready.  
-Shloka boot plays `/audio/shankh.mp3` (~4.5s at 75% volume).
+Catalogue listing goes through `/api/catalogue` so Drive Referer checks work from any host.
 
 See `Project.md` for behaviour and design notes (shloka, home/gallery chrome, rotating CTAs, Drive catalogue, share).

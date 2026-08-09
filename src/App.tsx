@@ -1425,8 +1425,14 @@ export default function App() {
   const showShloka = loopShloka || (!pathSlug() && !bootDone)
 
   return (
-    <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
-      <div className="relative w-full max-w-[480px] h-[100dvh]">
+    <div
+      className="flex justify-center items-stretch bg-white min-h-[100vh] min-h-[100dvh] min-h-[100svh]"
+      style={{
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
+      <div className="relative w-full max-w-[480px] h-[100vh] h-[100dvh] h-[100svh]">
         {contentReady && !loopShloka && (
           <div className="absolute inset-0"
             style={{
