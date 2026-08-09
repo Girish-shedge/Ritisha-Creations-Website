@@ -1430,7 +1430,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
 
   useEffect(() => {
     document.title = `${category.galleryTitle} · Rittisha Creations`
-    const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
+    const brandImage = `${window.location.origin}/favicon.png`
     const setMeta = (prop: string, content: string) => {
       let el = document.querySelector(`meta[property="${prop}"]`) as HTMLMetaElement | null
       if (!el) {
@@ -1443,7 +1443,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
     setMeta('og:title', category.galleryTitle)
     setMeta('og:description', 'Hey, check out this amazing piece by Rittisha Creations')
     setMeta('og:url', `${window.location.origin}${categoryPath(category.slug)}`)
-    if (cover) setMeta('og:image', cover.full)
+    setMeta('og:image', brandImage)
     return () => { document.title = 'Rittisha Creations' }
   }, [category])
 

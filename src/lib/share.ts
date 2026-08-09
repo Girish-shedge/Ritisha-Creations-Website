@@ -3,6 +3,7 @@ import { categoryUrl } from '@/data/categories'
 
 /** WhatsApp uses *text* for bold. */
 const SHARE_TEXT = 'Hey, check out this amazing piece by *Rittisha Creations*'
+const BRAND_SHARE_NAME = 'Rittisha-Creations.png'
 
 function extFor(mime: string) {
   if (mime.includes('png')) return 'png'
@@ -13,6 +14,24 @@ function extFor(mime: string) {
 
 const fileCache = new Map<string, Promise<File | null>>()
 const settled = new Map<string, File | null>()
+let brandShareFile: Promise<File | null> | null = null
+
+async function fetchBrandShareFile(): Promise<File | null> {
+  try {
+    const res = await fetch('/favicon.png')
+    if (!res.ok) return null
+    const blob = await res.blob()
+    if (!blob.size) return null
+    return new File([blob], BRAND_SHARE_NAME, { type: blob.type || 'image/png' })
+  } catch {
+    return null
+  }
+}
+
+function getBrandShareFile() {
+  if (!brandShareFile) brandShareFile = fetchBrandShareFile()
+  return brandShareFile
+}
 
 async function fetchPhotoFile(id: string, name: string): Promise<File | null> {
   const urls = [
@@ -49,8 +68,9 @@ function getShareFile(id: string, name: string) {
   return fileCache.get(id)!
 }
 
-/** Prefetch Image 1 for snappy share sheets. */
+/** Prefetch brand art + Image 1 for snappy share sheets. */
 export function prefetchCategoryShare(category: CategoryData) {
+  void getBrandShareFile()
   const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
   if (cover) prefetchShareFile(cover.id, cover.name || 'Image 1')
 }
@@ -60,6 +80,7 @@ export async function shareCategory(category: CategoryData) {
   // URL only in text — avoids WhatsApp duplicating via ShareData.url
   const text = `${SHARE_TEXT}\n${link}`
 
+  const brand = await getBrandShareFile()
   const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
   const coverFile = cover ? await getShareFile(cover.id, cover.name || 'Image 1') : null
 
@@ -70,7 +91,12 @@ export async function shareCategory(category: CategoryData) {
     if (f) extras.push(f)
   }
 
-  const files = coverFile ? [coverFile, ...extras] : []
+  // Brand image first so the share sheet preview is always श्री / site art
+  const files = [
+    ...(brand ? [brand] : []),
+    ...(coverFile ? [coverFile] : []),
+    ...extras,
+  ]
 
   try {
     if (files.length > 1) {

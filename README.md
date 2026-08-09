@@ -116,7 +116,7 @@ AGENTS.md               Figma Make / Vite agent notes
 ## Content rules (Drive)
 
 - Each **subfolder name** → category title + URL slug  
-- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = cover / share / OG  
+- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = gallery cover; site **favicon / OG / share-sheet** art is `/public/favicon.png` (श्री)  
 - Empty or non-image folders are skipped  
 - On API failure → last good `localStorage` cache (`ritisha.driveCatalogue.v4`)
 
