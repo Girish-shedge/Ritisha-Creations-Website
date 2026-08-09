@@ -1,6 +1,6 @@
 # Rittisha Creations — Decoration Showcase
 
-Mobile-first decoration showcase (max-width 480px). React 19 + Vite 8 + Tailwind CSS v4. Live: https://ritishacreations.vercel.app
+Mobile-first decoration showcase (max-width 480px). React 19 + Vite 8 + Tailwind CSS v4. Live: https://rittishacreations.vercel.app
 
 ---
 
@@ -29,18 +29,18 @@ Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer 
 - On API failure: last cached catalogue (`localStorage` `ritisha.driveCatalogue.v2`).
 - Share proxy: `/api/media?id=` (Vercel + Vite dev middleware).
 
-Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA rewrite in `vercel.json`.
+Deep links: `https://rittishacreations.vercel.app/{slug}` opens that gallery. SPA rewrite in `vercel.json`. Old host `ritishacreations.vercel.app` redirects here.
 
 ---
 
 ## Screens
 
 ### Home
-- Sticky blue wave header — "Rittisha Creations" (stroke → fill → text intro once per load)
-- Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together
+- Sticky blue wave header — "Rittisha Creations" flanked by swastik icons (stroke → fill → text intro once per load)
+- Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together; title overlay uses progressive blur **0→4** (top→bottom)
 - **"View all photos"** fixed full-width button — rotates with **“Prices starting from ₹499”** only after the card has been in view **≥1s** (same arming as image autoplay); opens gallery (card image is not a tap target)
-- Simple vertical list (no scroll scale/opacity)
-- End tagline: “Handcrafted and made with love ❤️” (`FS_CHROME`, **40px** top + bottom, **75%** opacity)
+- Simple vertical list (no scroll scale/opacity); back from gallery restores scroll position (same session)
+- End badge: Handcrafted / & made with love (Figma `326:261`, padding 24/25)
 - Site `bg.png` at **75%** opacity
 - No green WhatsApp footer on Home
 
@@ -49,7 +49,7 @@ Deep links: `https://ritishacreations.vercel.app/{slug}` opens that gallery. SPA
 - Share: `Hey, check out this amazing piece by *Rittisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
 - Edge-to-edge **1:1** photos, **16px** gap (flush under overlay nav + footer); session image cache skips placeholders on revisit
 - Footer chrome intro (stroke → fill → text) each open; images warm in parallel
-- Sticky green footer — rotates **“DM us for more information”** ↔ **“Customization also available”** (same slide-up text animation as home buttons)
+- Sticky green footer — after chrome intro completes, wait **1s**, then rotates **“DM us for more information”** ↔ **“Customization also available”** (same slide-up text animation as home buttons)
 - Site `bg.png` at **75%** opacity
 
 Navigation: History API paths + 280ms fade. Back → `/`.
@@ -59,7 +59,7 @@ Navigation: History API paths + 280ms fade. Back → `/`.
 ## Intro
 
 ### Shloka boot (first home load)
-Two Devanagari lines (Figma `309:764`), fill-only `#FC9C02`: glyphs fade in left→right, line 1 then line 2 (~2s each, denser glyphs get more time). After 4s, slow pulse 100%↔50% (~2.2s cycle) until fonts + Drive catalogue are ready; skip pulse if already ready. Fade out → mount home (so header stroke→fill→text runs from the start). Skipped on category deep links. Plays cropped **shankh** (`/audio/shankh.mp3`, ~4.5s, fade in/out, volume **75%**); if the browser blocks autoplay, first tap unlocks sound.
+Solid white (no pattern). Wooden plaque scales **110%→100%** (~1.4s ease-in-out), then four Devanagari lines fill left→right (~1.6s each, soft ease-in-out, `#DFCBC1` @75%). Pulse until fonts + Drive catalogue are ready. Plaque **slides up** (~0.8s) revealing home; then header stroke→fill→text starts. Skipped on category deep links. Silent (no audio).
 
 ### Home header (once per page load after shloka)
 Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  

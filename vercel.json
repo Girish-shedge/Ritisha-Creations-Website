@@ -1,6 +1,14 @@
 {
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "ritishacreations.vercel.app" }],
+      "destination": "https://rittishacreations.vercel.app/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
@@ -18,9 +26,9 @@
       ]
     },
     {
-      "source": "/audio/(.*)",
+      "source": "/api/catalogue",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
+        { "key": "Cache-Control", "value": "public, max-age=60, stale-while-revalidate=600" }
       ]
     }
   ]

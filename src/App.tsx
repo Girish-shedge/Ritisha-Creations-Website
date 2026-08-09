@@ -12,6 +12,7 @@ import bgImg from '@/assets/bg.png'
 import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
+import iconSwastik from '@/assets/icons/swastik.svg'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
@@ -67,9 +68,10 @@ function waCategoryMsg(name: string) {
 type IntroPhase = 'wait' | 'trace' | 'cards' | 'done'
 
 const T_TRACE_DUR = 1100
-const T_FILL_DUR  = 500
-const T_TEXT_DUR  = 400
-const T_CARDS_GAP = 700  // after header text, then enable scroll
+const T_FILL_DUR  = 550
+const T_MARK_DUR  = 420   // swastiks fade in at center
+const T_TEXT_DUR  = 550   // swastiks split + title reveal
+const T_CARDS_GAP = 900   // after header text, then enable scroll
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -137,22 +139,23 @@ function strokeDrawProps(opts: {
   }
 }
 
-/** Runs stroke → fill → text, advancing only after stroke CSS transition actually ends. */
-type ChromeStep = 'stroke' | 'fill' | 'text' | 'done'
+/**
+ * stroke (bottom→top L/R) → fill fade → marks fade at center →
+ * marks split + title reveal → done. Keeps final paint after play ends.
+ */
+type ChromeStep = 'stroke' | 'fill' | 'marks' | 'text' | 'done'
 function useChromeIntro(play: boolean, onComplete?: () => void) {
-  const [step, setStep] = useState<ChromeStep>(() => (play ? 'stroke' : 'done'))
+  const [step, setStep] = useState<ChromeStep>('stroke')
   const [traceGo, setTraceGo] = useState(false)
   const strokeDone = useRef(false)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
+  const startedRef = useRef(false)
 
-  // play false→true (or mount with play): run sequence from stroke.
-  // play true→false after finish: keep final 'done' paint.
   useEffect(() => {
-    if (!play) {
-      setTraceGo(false)
-      return
-    }
+    if (!play) return
+    if (startedRef.current) return
+    startedRef.current = true
     strokeDone.current = false
     setTraceGo(false)
     setStep('stroke')
@@ -161,7 +164,6 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
   useEffect(() => {
     if (!play || step !== 'stroke') return
     strokeDone.current = false
-    // Double rAF so dashoffset=1 paints before animating to 0
     let id2 = 0
     const id1 = requestAnimationFrame(() => {
       id2 = requestAnimationFrame(() => setTraceGo(true))
@@ -172,7 +174,6 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
     }
   }, [play, step])
 
-  // Fallback if transitionend doesn't fire (hidden/offscreen edge cases).
   useEffect(() => {
     if (!play || step !== 'stroke' || !traceGo) return
     const t = window.setTimeout(() => {
@@ -184,19 +185,25 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
   }, [play, step, traceGo])
 
   useEffect(() => {
-    if (!play || step !== 'fill') return
-    const t = window.setTimeout(() => setStep('text'), T_FILL_DUR)
+    if (step !== 'fill') return
+    const t = window.setTimeout(() => setStep('marks'), T_FILL_DUR)
     return () => clearTimeout(t)
-  }, [play, step])
+  }, [step])
 
   useEffect(() => {
-    if (!play || step !== 'text') return
+    if (step !== 'marks') return
+    const t = window.setTimeout(() => setStep('text'), T_MARK_DUR)
+    return () => clearTimeout(t)
+  }, [step])
+
+  useEffect(() => {
+    if (step !== 'text') return
     const t = window.setTimeout(() => {
       setStep('done')
       onCompleteRef.current?.()
     }, T_TEXT_DUR)
     return () => clearTimeout(t)
-  }, [play, step])
+  }, [step])
 
   const onStrokeTransitionEnd = (e: React.TransitionEvent<SVGPathElement>) => {
     if (e.propertyName !== 'stroke-dashoffset') return
@@ -205,12 +212,17 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
     setStep('fill')
   }
 
+  const filled = step === 'fill' || step === 'marks' || step === 'text' || step === 'done'
+  const marksOn = step === 'marks' || step === 'text' || step === 'done'
+  const split = step === 'text' || step === 'done'
+
   return {
     step,
     traceGo,
     onStrokeTransitionEnd,
-    showFill: step === 'fill' || step === 'text' || step === 'done',
-    showText: step === 'text' || step === 'done',
+    showFill: filled,
+    showMarks: marksOn,
+    showText: split,
     settled: step === 'done',
     tracing: step === 'stroke',
   }
@@ -225,7 +237,7 @@ function BlueHeader({
   playIntro: boolean
   onIntroComplete?: () => void
 }) {
-  const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
+  const { traceGo, onStrokeTransitionEnd, showFill, showMarks, showText, settled, tracing } =
     useChromeIntro(playIntro, onIntroComplete)
 
   const stroke = strokeDrawProps({
@@ -257,17 +269,57 @@ function BlueHeader({
         </defs>
       </svg>
       <span
-        className="absolute text-center text-white z-10 pointer-events-none"
+        className="absolute z-10 pointer-events-none flex items-center justify-center"
         style={{
           top: '43.4%', left: 24, right: 24,
-          transform: `translateY(-50%) translateY(${showText ? 0 : 8}px)`,
-          fontFamily: FONT_BOLD, fontWeight: 780,
-          fontSize: FS_CHROME, lineHeight: 1.2,
-          opacity: showText ? 1 : 0,
-          transition: `opacity ${T_TEXT_DUR}ms ease-in-out, transform ${T_TEXT_DUR}ms ease-in-out`,
+          transform: 'translateY(-50%)',
+          gap: showText ? 8 : 0,
+          transition: `gap ${T_TEXT_DUR}ms ease-in-out`,
         }}
       >
-        {label}
+        <img
+          src={iconSwastik}
+          alt=""
+          width={16}
+          height={16}
+          className="block size-4 shrink-0"
+          draggable={false}
+          style={{
+            opacity: showMarks ? 1 : 0,
+            transition: `opacity ${T_MARK_DUR}ms ease-in-out`,
+          }}
+        />
+        <span
+          className="text-center text-white overflow-hidden whitespace-nowrap"
+          style={{
+            fontFamily: FONT_BOLD,
+            fontWeight: 780,
+            fontSize: FS_CHROME,
+            lineHeight: 1.2,
+            opacity: showText ? 1 : 0,
+            maxWidth: showText ? 220 : 0,
+            transform: `translateY(${showText ? 0 : 6}px)`,
+            transition: [
+              `opacity ${T_TEXT_DUR}ms ease-in-out`,
+              `max-width ${T_TEXT_DUR}ms ease-in-out`,
+              `transform ${T_TEXT_DUR}ms ease-in-out`,
+            ].join(', '),
+          }}
+        >
+          {label}
+        </span>
+        <img
+          src={iconSwastik}
+          alt=""
+          width={16}
+          height={16}
+          className="block size-4 shrink-0"
+          draggable={false}
+          style={{
+            opacity: showMarks ? 1 : 0,
+            transition: `opacity ${T_MARK_DUR}ms ease-in-out`,
+          }}
+        />
       </span>
     </div>
   )
@@ -353,7 +405,7 @@ function RotatingLines({
 
 // ── Green sticky footer ───────────────────────────────────────
 function GreenFooter({
-  label, scrolled, href, playIntro = false, onIntroComplete, visible = true,
+  label, scrolled, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true,
 }: {
   label: string | string[]
   scrolled: boolean
@@ -361,6 +413,8 @@ function GreenFooter({
   playIntro?: boolean
   onIntroComplete?: () => void
   visible?: boolean
+  /** When false, show first line only (no rotation). */
+  rotateActive?: boolean
 }) {
   const uid = useId().replace(/:/g, '')
   const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
@@ -405,6 +459,7 @@ function GreenFooter({
           }}>
           <RotatingLines
             lines={labels}
+            active={rotateActive && showText}
             style={{
               fontFamily: FONT_BOLD, fontWeight: 780,
               fontSize: FS_CHROME, lineHeight: 1.4, color: '#0d2b08',
@@ -413,6 +468,64 @@ function GreenFooter({
         </span>
       </div>
     </a>
+  )
+}
+
+/** Home end badge — Figma 326:261, hardcoded for crisp edges. */
+function HandcraftedBadge() {
+  return (
+    <div
+      className="relative w-full flex justify-center"
+      style={{ paddingTop: 24, paddingBottom: 25 }}
+      aria-label="Handcrafted and made with love"
+    >
+      <div
+        className="relative"
+        style={{
+          width: 204,
+          height: 91,
+          filter: 'drop-shadow(0px 4px 10px rgba(0,0,0,0.22))',
+        }}
+      >
+        <svg
+          viewBox="0 0 204.132 90.7594"
+          width="204"
+          height="91"
+          className="absolute inset-0 block"
+          aria-hidden
+        >
+          <defs>
+            <linearGradient id="hcBadgeGrad" x1="102.066" y1="0" x2="102.066" y2="90.7594" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#FC9C02" />
+              <stop offset="1" stopColor="#964E01" />
+            </linearGradient>
+            <filter id="hcBadgeInner" x="-4%" y="-8%" width="108%" height="116%" filterUnits="objectBoundingBox">
+              <feOffset dy="-2" />
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" />
+              <feColorMatrix values="0 0 0 0 0.507692 0 0 0 0 0.307627 0 0 0 0 0 0 0 0 1 0" />
+              <feBlend in2="SourceGraphic" mode="normal" />
+            </filter>
+          </defs>
+          <path
+            filter="url(#hcBadgeInner)"
+            fill="url(#hcBadgeGrad)"
+            d="M102.066 90.7594C110.211 75.6331 122.625 78.7644 171.226 84.3472C176.873 84.9958 181.824 80.5803 181.824 74.8964V68.1461C193.399 70.3657 204.132 61.4955 204.132 49.7098V41.0497C204.132 29.264 193.399 20.3938 181.824 22.6134V15.863C181.824 -10.3524 117.801 29.2214 102.066 0C86.403 29.0888 22.3079 -10.3074 22.3079 15.863V22.6134C10.7333 20.3935 0 29.264 0 41.0497V49.7098C0 61.4955 10.7333 70.3657 22.3079 68.1461V74.8964C22.3079 80.5803 27.2595 84.9958 32.9062 84.3472C81.562 78.7584 93.9471 75.6817 102.066 90.7594Z"
+          />
+        </svg>
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center text-center text-white pointer-events-none"
+          style={{ paddingTop: 4, textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
+        >
+          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 16, lineHeight: 'normal' }}>
+            Handcrafted
+          </span>
+          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 13, lineHeight: 'normal' }}>
+            & made with love
+          </span>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -573,15 +686,35 @@ function DriveImg({
   )
 }
 
-// ── Card blur overlay ─────────────────────────────────────────
+// ── Card blur overlay (progressive blur 0 → 4, top → bottom) ──
 function CardBlurOverlay({ uid }: { uid: string }) {
   const clipId = `cClip_${uid}`, gradId = `cGrad_${uid}`
   return (
     <div className="absolute bottom-0 left-0 right-0" style={{ height: '33.2%' }}>
       <svg className="absolute inset-0 size-full" viewBox="0 0 361 120" preserveAspectRatio="none" fill="none">
         <foreignObject height="128" width="369" x="-4" y="-4">
-          <div style={{ backdropFilter: 'blur(1px)', clipPath: `url(#${clipId})`, height: '100%', width: '100%' }}
-            {...{ xmlns: 'http://www.w3.org/1999/xhtml' }} />
+          <div
+            {...{ xmlns: 'http://www.w3.org/1999/xhtml' }}
+            style={{ position: 'relative', height: '100%', width: '100%', clipPath: `url(#${clipId})` }}
+          >
+            {/* Stronger blur at bottom; masks stack to 0→4 */}
+            <div
+              style={{
+                position: 'absolute', inset: 0,
+                backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+                maskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute', inset: 0,
+                backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
+                maskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
+                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
+              }}
+            />
+          </div>
         </foreignObject>
         <path d={CARD_OVERLAY} fill={`url(#${gradId})`} fillOpacity="0.3" />
         <defs>
@@ -827,7 +960,7 @@ function CategoryCard({
       style={{
         opacity: introVisible ? 1 : 0,
         transform: introVisible ? 'translateY(0)' : 'translateY(52px)',
-        transition: `opacity 550ms ease-out ${introDelay}ms, transform 550ms cubic-bezier(0.22,1,0.36,1) ${introDelay}ms`,
+        transition: `opacity 650ms ease-in-out ${introDelay}ms, transform 650ms ease-in-out ${introDelay}ms`,
       }}>
       <div
         className="relative w-full overflow-hidden"
@@ -879,13 +1012,25 @@ interface HomeScreenProps {
   onViewAll: (cat: CategoryData) => void
   introPhase: IntroPhase
   setIntroPhase: (p: IntroPhase) => void
+  /** Restored after back-from-gallery; undefined = leave at top. */
+  restoreScrollTop?: number
+  onScrollTopChange?: (y: number) => void
 }
-function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeScreenProps) {
+function HomeScreen({
+  categories, onViewAll, introPhase, setIntroPhase, restoreScrollTop, onScrollTopChange,
+}: HomeScreenProps) {
   const headerRef = useRef<HTMLDivElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const restoredRef = useRef(false)
   const [scrolled, setScrolled] = useState(false)
   const [headerH, setHeaderH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
+
+  const [headerPlay, setHeaderPlay] = useState(false)
+
+  useEffect(() => {
+    if (introPhase === 'trace') setHeaderPlay(true)
+  }, [introPhase])
 
   const onHeaderIntroComplete = useCallback(() => {
     setIntroPhase('cards')
@@ -906,6 +1051,18 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
     return () => window.removeEventListener('resize', measure)
   }, [])
 
+  // Restore scroll once when returning from gallery (same session)
+  useLayoutEffect(() => {
+    if (restoredRef.current) return
+    if (restoreScrollTop == null || restoreScrollTop <= 0) return
+    if (introPhase !== 'done') return
+    const el = scrollerRef.current
+    if (!el) return
+    el.scrollTop = restoreScrollTop
+    setScrolled(restoreScrollTop > 8)
+    restoredRef.current = true
+  }, [restoreScrollTop, introPhase])
+
   const cardsVisible = introPhase === 'cards' || introPhase === 'done'
   const scrollable = introPhase === 'done'
 
@@ -917,7 +1074,7 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
         <BlueHeader
           label="Rittisha Creations"
           scrolled={scrolled}
-          playIntro={introPhase === 'trace'}
+          playIntro={headerPlay}
           onIntroComplete={onHeaderIntroComplete}
         />
       </div>
@@ -929,7 +1086,12 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
           paddingTop: headerH + 16,
           overflowY: scrollable ? 'auto' : 'hidden',
         }}
-        onScroll={(e) => scrollable && setScrolled(e.currentTarget.scrollTop > 8)}
+        onScroll={(e) => {
+          if (!scrollable) return
+          const y = e.currentTarget.scrollTop
+          setScrolled(y > 8)
+          onScrollTopChange?.(y)
+        }}
       >
         <div className="flex flex-col gap-10 items-center px-4 pt-4">
           {categories.map((cat, i) => (
@@ -943,21 +1105,7 @@ function HomeScreen({ categories, onViewAll, introPhase, setIntroPhase }: HomeSc
               scrollActive={scrollable}
             />
           ))}
-          <p
-            className="m-0 w-full text-center"
-            style={{
-              fontFamily: FONT_BOLD,
-              fontWeight: 780,
-              fontSize: FS_CHROME,
-              lineHeight: 1.4,
-              color: '#1a1a1a',
-              opacity: 0.75,
-              paddingTop: 40,
-              paddingBottom: 40,
-            }}
-          >
-            Handcrafted and made with love ❤️
-          </p>
+          <HandcraftedBadge />
         </div>
       </div>
     </div>
@@ -1031,6 +1179,7 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
 function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
+  const [rotateReady, setRotateReady] = useState(false)
   const [sharing, setSharing] = useState(false)
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
@@ -1040,6 +1189,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   useEffect(() => {
     setScrolled(false)
     setFooterReady(false)
+    setRotateReady(false)
     setNavIn(false)
     setShowPhotos(false)
     setPlayFooter(false)
@@ -1063,6 +1213,16 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
       cancelAnimationFrame(id2)
     }
   }, [category])
+
+  // After footer chrome intro completes, wait 1s before rotating copy
+  useEffect(() => {
+    if (!footerReady) {
+      setRotateReady(false)
+      return
+    }
+    const t = window.setTimeout(() => setRotateReady(true), 1000)
+    return () => clearTimeout(t)
+  }, [footerReady])
 
   useEffect(() => {
     document.title = `${category.galleryTitle} · Rittisha Creations`
@@ -1102,6 +1262,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
             href={waUrl(waCategoryMsg(category.galleryTitle))}
             playIntro
             onIntroComplete={() => setFooterReady(true)}
+            rotateActive={rotateReady}
           />
         )}
       </div>
@@ -1174,6 +1335,8 @@ export default function App() {
   const [introPhase, setIntroPhase] = useState<IntroPhase>(() =>
     pathSlug() ? 'trace' : 'wait',
   )
+  const homeScrollTop = useRef(0)
+  const [restoreScrollTop, setRestoreScrollTop] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -1216,13 +1379,23 @@ export default function App() {
   }, [categories, selected])
 
   const onShlokaDone = useCallback(() => {
-    setBootDone(true)
+    // Fade starts — kick header animation while shloka is still covering home
     setIntroPhase('trace')
+  }, [])
+
+  const onShlokaGone = useCallback(() => {
+    setBootDone(true)
   }, [])
 
   const navigate = useCallback((cat: CategoryData | null) => {
     setVisible(false)
     setTimeout(() => {
+      if (cat) {
+        // Leaving home → keep scroll for back-from-gallery restore
+        setRestoreScrollTop(undefined)
+      } else {
+        setRestoreScrollTop(homeScrollTop.current)
+      }
       setSelected(cat)
       const path = cat ? categoryPath(cat.slug) : '/'
       window.history.pushState({}, '', path)
@@ -1244,17 +1417,17 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [categories])
 
-  const contentReady = fontsReady && catalogueReady && (bootDone || Boolean(pathSlug()))
-  const showShloka = !pathSlug() && !bootDone
+  const contentReady = fontsReady && catalogueReady
+  // Review mode: ?loop=1 keeps shloka replaying (no home handoff).
+  const [loopShloka] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('loop'),
+  )
+  const showShloka = loopShloka || (!pathSlug() && !bootDone)
 
   return (
     <div className="flex justify-center items-stretch min-h-[100dvh] bg-white">
       <div className="relative w-full max-w-[480px] h-[100dvh]">
-        {showShloka && (
-          <ShlokaIntro ready={fontsReady && catalogueReady} onDone={onShlokaDone} />
-        )}
-        {/* Mount home only after shloka so BlueHeader intro starts from stroke, not a finished frame */}
-        {contentReady && (
+        {contentReady && !loopShloka && (
           <div className="absolute inset-0"
             style={{
               opacity: visible ? 1 : 0,
@@ -1268,8 +1441,18 @@ export default function App() {
                   onViewAll={(cat) => navigate(cat)}
                   introPhase={introPhase}
                   setIntroPhase={setIntroPhase}
+                  restoreScrollTop={restoreScrollTop}
+                  onScrollTopChange={(y) => { homeScrollTop.current = y }}
                 />}
           </div>
+        )}
+        {showShloka && (
+          <ShlokaIntro
+            ready={fontsReady && catalogueReady}
+            onDone={onShlokaDone}
+            onGone={onShlokaGone}
+            loop={loopShloka}
+          />
         )}
       </div>
     </div>

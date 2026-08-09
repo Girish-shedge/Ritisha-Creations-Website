@@ -18,11 +18,26 @@ function loadEnvLocal() {
   }
 }
 
-/** Local / preview stand-in for Vercel `api/media.js`. */
+/** Local / preview stand-in for Vercel `api/media.js` + `api/catalogue.js`. */
 function driveMediaProxy(): Plugin {
   loadEnvLocal()
   const handler: Connect.NextHandleFunction = async (req, res, next) => {
     const url = req.url || ''
+    if (url.startsWith('/api/catalogue')) {
+      try {
+        const { buildCatalogue } = await import('./api/catalogue.js')
+        const categories = await buildCatalogue()
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.setHeader('Cache-Control', 'public, max-age=60')
+        res.end(JSON.stringify({ categories }))
+      } catch (err) {
+        res.statusCode = 502
+        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+        res.end(JSON.stringify({ error: String((err as Error).message || err) }))
+      }
+      return
+    }
     if (!url.startsWith('/api/media')) return next()
     try {
       const id = new URL(url, 'http://local').searchParams.get('id') || ''
@@ -40,7 +55,7 @@ function driveMediaProxy(): Plugin {
       const referer =
         process.env.GOOGLE_API_REFERER ||
         process.env.VITE_GOOGLE_API_REFERER ||
-        'http://localhost:5173/'
+        'https://ritishacreations.vercel.app/'
       const upstream = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${key}&supportsAllDrives=true`,
         { headers: { Referer: referer } },

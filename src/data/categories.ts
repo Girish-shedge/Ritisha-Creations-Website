@@ -58,6 +58,6 @@ export function categoryPath(slug: string) {
 }
 
 export function categoryUrl(slug: string) {
-  if (typeof window === 'undefined') return `https://ritishacreations.vercel.app/${slug}`
+  if (typeof window === 'undefined') return `https://rittishacreations.vercel.app/${slug}`
   return `${window.location.origin}/${slug}`
 }

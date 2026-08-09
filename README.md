@@ -2,7 +2,7 @@
 
 Mobile decoration showcase. Browse categories, open galleries, enquire on WhatsApp.
 
-**Live:** https://ritishacreations.vercel.app  
+**Live:** https://rittishacreations.vercel.app  
 **Repo:** https://github.com/Girish-shedge/Ritisha-Creations-Website
 
 ## Stack
