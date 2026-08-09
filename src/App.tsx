@@ -37,7 +37,7 @@ import iconSwastik from '@/assets/icons/swastik.svg'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
-const CARD_ARM_MS = 1000
+const CARD_ARM_MS = 500
 const GALLERY_NAV_MS = 520
 
 // ── Design tokens ─────────────────────────────────────────────
@@ -467,6 +467,8 @@ function GreenFooter({
     useChromeIntro(playIntro, onIntroComplete, { skipMarks: true })
   const labels = Array.isArray(label) ? label : [label]
   const aria = labels.join(' — ')
+  // Explicit px height — aspect-ratio + % height collapses to 0 on some iOS WebViews
+  const waveH = Math.min(typeof window !== 'undefined' ? window.innerWidth : 393, 480) / WAVE_AR
 
   const stroke = strokeDrawProps({
     color: '#4CED77',
@@ -480,9 +482,16 @@ function GreenFooter({
 
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
-      className="pointer-events-auto block size-full active:opacity-75" aria-label={aria}
-      style={{ visibility: visible ? 'visible' : 'hidden' }}>
-      <div className="relative w-full h-full">
+      className="pointer-events-auto block w-full active:opacity-75" aria-label={aria}
+      style={{
+        visibility: visible ? 'visible' : 'hidden',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        boxSizing: 'content-box',
+      }}>
+      <div
+        className="relative w-full"
+        style={{ height: waveH, minHeight: 72 }}
+      >
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
           {(settled || locked) && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
@@ -533,7 +542,7 @@ function HandcraftedBadge() {
   return (
     <div
       className="relative w-full flex justify-center"
-      style={{ paddingTop: 24, paddingBottom: 40 }}
+      style={{ paddingTop: 24, paddingBottom: 'calc(40px + env(safe-area-inset-bottom, 0px))' }}
       aria-label="Handcrafted and made with love"
     >
       <div
@@ -738,8 +747,7 @@ function DriveImg({
         className="absolute inset-0 size-full object-cover object-center block"
         style={{
           maxWidth: 'none',
-          opacity: showPhoto ? 0 : 0.55,
-          mixBlendMode: 'multiply',
+          opacity: showPhoto ? 0 : 1,
           transition: 'opacity 280ms ease-in-out',
         }}
         draggable={false}
@@ -1021,7 +1029,7 @@ function CategoryCard({
   const [armed, setArmed] = useState(false)
   const onSlide = useCallback((i: number) => setSlide(i), [])
 
-  // Autoplay after the card has been mostly in view for 1s
+  // Autoplay after the card has been mostly in view for 0.5s
   useEffect(() => {
     if (!scrollActive) {
       setArmed(false)
@@ -1337,13 +1345,13 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
     }
   }, [category])
 
-  // After footer chrome intro completes, wait 1s before rotating copy
+  // After footer chrome intro completes, wait 0.5s before rotating copy
   useEffect(() => {
     if (!footerReady) {
       setRotateReady(false)
       return
     }
-    const t = window.setTimeout(() => setRotateReady(true), 1000)
+    const t = window.setTimeout(() => setRotateReady(true), CARD_ARM_MS)
     return () => clearTimeout(t)
   }, [footerReady])
 
@@ -1422,15 +1430,10 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
           ))}
         </div>
       </div>
-      {/* After scroll in DOM + high z — same aspect shell as BlueHeader on home */}
+      {/* After scroll in DOM + high z — explicit height (aspect-ratio collapses on iOS) */}
       <div
         ref={footerRef}
         className="absolute bottom-0 left-0 right-0 z-50"
-        style={{
-          aspectRatio: `${WAVE_AR}`,
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          boxSizing: 'content-box',
-        }}
       >
         <GreenFooter
           key={category.id}

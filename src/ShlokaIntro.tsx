@@ -33,7 +33,7 @@ const OM_SPIN_S = 40
 const OM_OPACITY = 0.32
 
 /** Steady letter drop-shadow (glow layered on top while appearing). */
-const LETTER_SHADOW = 'drop-shadow(0px 1.5px 2px rgba(48, 30, 21, 0.55))'
+const LETTER_SHADOW = 'drop-shadow(0px 2px 3px rgba(48, 30, 21, 0.65))'
 
 const DESIGN_W = 393
 const DESIGN_H = 800
@@ -114,11 +114,11 @@ function paintLine(glyphs: Glyph[], localT: number) {
     const glow = glowEnvelope(local) * appear
     maxGlow = Math.max(maxGlow, glow)
     if (glow > 0.02) {
-      const blur = 2 + glow * 6
-      const soft = 6 + glow * 10
+      const blur = 3 + glow * 8
+      const soft = 8 + glow * 14
       g.el.style.filter = [
-        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.95 * glow}))`,
-        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.55 * glow}))`,
+        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.98 * glow}))`,
+        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.7 * glow}))`,
         LETTER_SHADOW,
       ].join(' ')
     } else {
@@ -129,11 +129,11 @@ function paintLine(glyphs: Glyph[], localT: number) {
   const host = glyphs[0]?.el.closest('div')
   if (host instanceof HTMLElement) {
     if (maxGlow > 0.02) {
-      const blur = 2 + maxGlow * 6
-      const soft = 6 + maxGlow * 10
+      const blur = 3 + maxGlow * 8
+      const soft = 8 + maxGlow * 14
       host.style.filter = [
-        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.95 * maxGlow}))`,
-        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.55 * maxGlow}))`,
+        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.98 * maxGlow}))`,
+        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.7 * maxGlow}))`,
         LETTER_SHADOW,
       ].join(' ')
     } else {
@@ -478,13 +478,13 @@ export default function ShlokaIntro({
         }}
         aria-hidden
       >
-        {/* Flip via wrapper — scaleY on <img> often paints blank on iOS */}
+        {/* Vertical mirror of top: same rotate(180) then scaleY on wrapper (not <img> — iOS blank paint) */}
         <div className="size-full" style={{ transform: 'scaleY(-1)', transformOrigin: 'center center' }}>
           <img
             src={borderOrnament}
             alt=""
             className="block size-full"
-            style={{ objectFit: 'fill' }}
+            style={{ objectFit: 'fill', transform: 'rotate(180deg)' }}
             draggable={false}
           />
         </div>
