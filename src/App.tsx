@@ -11,11 +11,13 @@
  * SECTION MAP (search for "──")
  *   Design tokens / SVG paths     Header, footer, card frame geometry
  *   useChromeIntro                Shared stroke → fill → (marks) → text
- *   BlueHeader / GreenFooter      Sticky chrome
+ *   BlueHeader / GreenFooter      Sticky chrome (footer = WAVE_AR shell + h-full, always on gallery)
  *   RotatingLines                 CTA / footer copy rotator
- *   DriveImg / Card*              Photos, blur, scroller, category card
+ *   DriveImg / Card*              Photos, frame-masked blur, scroller, category card
  *   HomeScreen / GalleryScreen    Screens
  *   App (default export)          Root
+ *
+ * See Project.md for mobile do-not-regress (footer CTA, card blur cuts, shloka glow).
  */
 import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId, useMemo } from 'react'
 import {

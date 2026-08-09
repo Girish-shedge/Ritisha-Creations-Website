@@ -2,7 +2,7 @@
 
 Mobile-first decoration showcase (max-width **480px**).  
 Stack: React 19 + Vite 8 + Tailwind CSS v4.  
-Live: https://rittishacreations.vercel.app
+Live: https://rittishacreations.vercel.app (two **t**’s — see Deploy below)
 
 This file is the **product/behaviour** source of truth. For “how to run / where is the code?”, see `README.md`.
 
@@ -39,9 +39,9 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 ## Screens
 
 ### Home
-- Sticky blue wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home)
+- Sticky blue wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`)
 - Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥1s** mostly in view); swipe overrides; dots **4→12×4**
-- Title overlay: progressive blur **0→4** (top→bottom) + dark scrim
+- Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - **View all photos** ↔ **Prices starting from ₹499** (arms with the same ≥1s in-view rule)
 - End badge: Handcrafted / & made with love (padding top 24 / bottom **40**)
 - Site `bg.png` at **75%** opacity
@@ -51,9 +51,11 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
 - Circular back / share; truncated white title
 - Share copy + category URL; Image 1 prefetched
-- Edge-to-edge **1:1** photos, **16px** gap; `paddingBottom` = footer height
-- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step)
+- Edge-to-edge **1:1** photos, **16px** gap; `paddingBottom` = measured footer height (includes safe-area)
+- **Green footer must always be present** on every catalog detail open (same wave shell pattern as BlueHeader: outer `aspectRatio: WAVE_AR`, inner `h-full`)
+- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
 - After intro + **1s**, rotates **DM us for more information** ↔ **Customization also available**
+- Footer stacks **above** the photo scroller (`z-50`, after scroll in DOM); `paddingBottom: env(safe-area-inset-bottom)` on the footer shell
 
 Navigation: History API + **280ms** fade. Back → `/`.
 
@@ -62,15 +64,29 @@ Navigation: History API + **280ms** fade. Back → `/`.
 ## Intro
 
 ### Shloka (`ShlokaIntro.tsx`) — first home load only
-Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow) → hold → exit**.  
-Viewport-pinned ornaments; plaque stage scales to fit. Skipped on `/{slug}` deep links.  
-`?loop=1` replays forever (review). `onDone` starts home header; `onGone` unmounts overlay.
+Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow) → hold → exit**.
+
+- Shell height from `visualViewport`; ornaments use **px `translate3d`**, not `%` slides.
+- Bottom border sits at `bottom: env(safe-area-inset-bottom)` (not under the home indicator).
+- Bottom ornament flip: **wrapper** `scaleY(-1)` (not on `<img>` — iOS can paint blank).
+- Letters: per-glyph CSS `drop-shadow` + mid-reveal glow (`LETTER_SHADOW` + glow envelope); **also** apply the same filter on the line **host** so iOS still shows shadow/glow when path filters are ignored. Do not replace with a single heavy filter on the whole text block.
+- Plaque stage: 393×800 scaled with `min(vw, vh)`.
+- Skipped on `/{slug}` deep links. `?loop=1` replays forever (review).
+- `onDone` starts home header; `onGone` unmounts overlay.
 
 ### Home header — after shloka
 `introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay when returning from gallery (`settleInstant`).
 
 ### Gallery footer — each category open
-Stroke → fill → text via `useChromeIntro({ skipMarks: true })`.
+Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill → text via `useChromeIntro({ skipMarks: true })`.
+
+---
+
+## Mobile / browser notes (do not regress)
+
+- `viewport-fit=cover` in `index.html`; safe-area insets on shell + gallery footer.
+- Test **iOS Chrome + Safari** and Android: green footer CTA text, shloka **both** borders, letter shadow/glow, card blur following cuts.
+- After every `vercel deploy --prod`, alias **`rittishacreations.vercel.app`** (two t’s). Vercel often aliases the old one-t host (`ritishacreations.vercel.app`) instead.
 
 ---
 

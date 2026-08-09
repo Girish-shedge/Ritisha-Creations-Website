@@ -7,17 +7,19 @@ Mobile decoration showcase: browse categories → open a gallery → enquire on 
 
 ---
 
-## Start here (first time in this repo)
+## Start here (first time in this repo / new chat)
 
 Read in this order:
 
-1. **This README** — run the app, map of folders, request flow  
-2. **`Project.md`** — product behaviour (animations, CTAs, Drive rules)  
+1. **This README** — run the app, map of folders, request flow, deploy alias  
+2. **`Project.md`** — product behaviour (animations, CTAs, Drive rules, mobile gotchas)  
 3. **`src/App.tsx`** — all screens/UI (file opens with a section map)  
 4. **`src/ShlokaIntro.tsx`** — boot shloka animation only  
 5. **`src/data/driveCatalogue.ts`** + **`api/catalogue.js`** — how categories/photos are loaded  
 
 You do **not** need `src/imports/` or root `imports/` — those are raw Figma dumps, unused by the app.
+
+Agent style: `.cursor/rules/ponytail.mdc` (smallest correct fix; reuse existing patterns).
 
 ---
 
@@ -57,12 +59,21 @@ Browser
   → ShlokaIntro (home only; skipped on /{slug} deep links)
   → loadCatalogue() → GET /api/catalogue → Drive folders + Image N files
   → HomeScreen (cards) or GalleryScreen (photos)
-  → WhatsApp link on gallery footer
+  → WhatsApp link on gallery green footer (always present on detail)
 ```
 
 **Routing:** History API paths. `/` = home, `/{slug}` = that category’s gallery. `vercel.json` SPA rewrite.
 
-**Deploy note:** Production hostname is **`rittishacreations.vercel.app`** (two t’s). After `vercel deploy --prod`, alias that host to the new deployment if Vercel pointed the old single-t domain.
+### Deploy (required every prod push)
+
+Production hostname is **`rittishacreations.vercel.app`** (two t’s in *Rittisha*).
+
+```bash
+npx vercel deploy --prod --yes
+npx vercel alias set <deployment-url> rittishacreations.vercel.app
+```
+
+Vercel often auto-aliases the old one-t domain (`ritishacreations.vercel.app`). Always re-alias the two-t host after deploy.
 
 ---
 
@@ -83,8 +94,9 @@ api/
   catalogue.js          Vercel serverless — lists Drive (Referer-safe)
   media.js              Image proxy fallback for share / stubborn files
 public/fonts/           Season Mix Bold + SemiBold
-Project.md              Behaviour / design contract
+Project.md              Behaviour / design contract (+ mobile do-not-regress)
 AGENTS.md               Figma Make / Vite agent notes
+.cursor/rules/ponytail.mdc   Prefer smallest correct change
 ```
 
 ### `App.tsx` sections (search for `──`)
@@ -93,8 +105,9 @@ AGENTS.md               Figma Make / Vite agent notes
 |---------|------------|
 | Design tokens / SVG paths | Header, footer, card frame geometry |
 | `useChromeIntro` | Shared stroke → fill → text for blue header & green footer |
-| `BlueHeader` / `GreenFooter` | Sticky chrome |
-| `DriveImg` / `Card*` | Images, progressive blur, card scroller |
+| `BlueHeader` / `GreenFooter` | Sticky chrome (footer mirrors header shell: `WAVE_AR` + `h-full`) |
+| `RotatingLines` | CTA / footer copy rotator |
+| `DriveImg` / `Card*` | Images, frame-masked blur, card scroller |
 | `HomeScreen` / `GalleryScreen` | The two screens |
 | `App` (default export) | Catalogue load, shloka gate, navigation |
 

@@ -2,8 +2,12 @@
 
 This repo is a **Figma Make** Vite app that ships the **Rittisha Creations** site.
 
-**Product docs first:** `README.md` (onboarding + folder map) → `Project.md` (behaviour).  
+**Product docs first:** `README.md` (onboarding + folder map + deploy alias) → `Project.md` (behaviour + mobile do-not-regress).  
 **UI entry:** `src/App.tsx` (section map in the file header) → `src/ShlokaIntro.tsx`.
+
+**Live:** https://rittishacreations.vercel.app (two t’s). After every prod deploy, alias that host — Vercel often points the old one-t domain instead.
+
+**Do not regress (see `Project.md`):** gallery green footer always visible with intro + rotating DM/Customization copy; card blur clipped to corner cuts; shloka both borders + per-letter glow/shadow (host filter for iOS).
 
 ---
 
