@@ -465,6 +465,8 @@ function GreenFooter({
     useChromeIntro(playIntro, onIntroComplete, { skipMarks: true })
   const labels = Array.isArray(label) ? label : [label]
   const aria = labels.join(' — ')
+  // Explicit px height — aspect-ratio alone collapses on some iOS WebViews
+  const footerH = Math.min(typeof window !== 'undefined' ? window.innerWidth : 393, 480) / WAVE_AR
 
   const stroke = strokeDrawProps({
     color: '#4CED77',
@@ -476,8 +478,19 @@ function GreenFooter({
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
       className="pointer-events-auto block active:opacity-75" aria-label={aria}
-      style={{ visibility: visible ? 'visible' : 'hidden' }}>
-      <div className="relative w-full" style={{ aspectRatio: `${WAVE_AR}` }}>
+      style={{
+        visibility: visible ? 'visible' : 'hidden',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}>
+      <div
+        className="relative w-full"
+        style={{
+          height: footerH,
+          minHeight: 72,
+          // Fallback so the CTA never disappears if SVG fill fails mid-animation
+          background: showFill ? 'linear-gradient(to top, #4CED77, #6CEB3E)' : 'transparent',
+        }}
+      >
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
           {settled && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
@@ -494,19 +507,27 @@ function GreenFooter({
             </linearGradient>
           </defs>
         </svg>
-        <span className="absolute left-0 right-0 z-10 pointer-events-none px-3"
+        <span
+          className="absolute left-0 right-0 z-10 pointer-events-none px-3 text-center"
           style={{
-            bottom: '40%',
-            transform: `translateY(50%) translateY(${showText ? 0 : 8}px)`,
+            // Thick green band sits in the lower half (wave peak is at the top of the SVG)
+            bottom: '26%',
+            transform: `translateY(50%) translateY(${showText ? 0 : 6}px)`,
             opacity: showText ? 1 : 0,
             transition: `opacity ${T_TEXT_DUR}ms ease-in-out, transform ${T_TEXT_DUR}ms ease-in-out`,
-          }}>
+          }}
+        >
           <RotatingLines
             lines={labels}
             active={rotateActive && showText}
             style={{
-              fontFamily: FONT_BOLD, fontWeight: 780,
-              fontSize: FS_CHROME, lineHeight: 1.4, color: '#0d2b08',
+              fontFamily: FONT_BOLD,
+              fontWeight: 780,
+              fontSize: FS_CHROME,
+              lineHeight: 1.35,
+              color: '#041a08',
+              WebkitTextFillColor: '#041a08',
+              textShadow: '0 0 1px rgba(4,26,8,0.35)',
             }}
           />
         </span>
@@ -755,49 +776,58 @@ function DriveImg({
   )
 }
 
-// ── Card blur overlay (CSS progressive blur 0 → 4, top → bottom) ──
+// ── Card blur overlay (soft progressive blur, clipped to card frame cuts) ──
 function CardBlurOverlay({ uid }: { uid: string }) {
   const gradId = `cGrad_${uid}`
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 pointer-events-none z-[1]"
-      style={{ height: '42%' }}
+      className="absolute inset-0 pointer-events-none z-[1]"
+      style={{
+        // Same corner cuts as the photo — keeps blur/scrim inside the frame
+        WebkitMaskImage: CARD_FRAME_MASK,
+        maskImage: CARD_FRAME_MASK,
+        WebkitMaskSize: '100% 100%',
+        maskSize: '100% 100%',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+      }}
     >
-      {/* Progressive blur: 0 (top) → 4px (bottom) */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backdropFilter: 'blur(4px)',
-          WebkitBackdropFilter: 'blur(4px)',
-          maskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
-        }}
-      />
-      <div
-        className="absolute inset-0"
-        style={{
-          backdropFilter: 'blur(2px)',
-          WebkitBackdropFilter: 'blur(2px)',
-          maskImage: 'linear-gradient(to bottom, transparent 0%, #000 50%, #000 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 50%, #000 100%)',
-        }}
-      />
-      {/* Scrim fallback — keeps titles readable if backdrop-filter is skipped */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.22) 45%, transparent 100%)',
-        }}
-      />
-      <svg className="absolute inset-0 size-full" viewBox="0 0 361 120" preserveAspectRatio="none" fill="none" aria-hidden>
-        <path d={CARD_OVERLAY} fill={`url(#${gradId})`} fillOpacity="0.25" />
-        <defs>
-          <linearGradient id={gradId} x1="180.5" y1="120" x2="180.5" y2="0" gradientUnits="userSpaceOnUse">
-            <stop /><stop offset="1" stopColor="white" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-      </svg>
+      <div className="absolute bottom-0 left-0 right-0" style={{ height: '36%' }}>
+        {/* Softer progressive blur 0 → ~2.5 (was 4). May no-op under mask on some iOS; scrim still clips. */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backdropFilter: 'blur(2.5px)',
+            WebkitBackdropFilter: 'blur(2.5px)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            backdropFilter: 'blur(1.25px)',
+            WebkitBackdropFilter: 'blur(1.25px)',
+            maskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.14) 48%, transparent 100%)',
+          }}
+        />
+        <svg className="absolute inset-0 size-full" viewBox="0 0 361 120" preserveAspectRatio="none" fill="none" aria-hidden>
+          <path d={CARD_OVERLAY} fill={`url(#${gradId})`} fillOpacity="0.2" />
+          <defs>
+            <linearGradient id={gradId} x1="180.5" y1="120" x2="180.5" y2="0" gradientUnits="userSpaceOnUse">
+              <stop /><stop offset="1" stopColor="white" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
     </div>
   )
 }
@@ -1357,7 +1387,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
-      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-30">
+      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-40" style={{ isolation: 'isolate' }}>
         {playFooter && (
           <GreenFooter
             key={category.id}
@@ -1394,7 +1424,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
         />
       </GalleryNavChrome>
       <div
-        className="absolute inset-0 overflow-y-auto"
+        className="absolute inset-0 z-10 overflow-y-auto"
         style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >

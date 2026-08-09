@@ -2,9 +2,9 @@
  * Boot shloka overlay (home only).
  *
  * Phase order: borders → plaque (slate) → Om → dividers → letter reveal → hold → exit.
- * - Borders are pinned to the real viewport so both edges stay visible on short phones.
- * - Plaque + text live on a 393×800 stage scaled with min(vw, vh).
- * - Letters use CSS drop-shadow for glow/shadow (reliable on mobile).
+ * - Borders pinned to the visual viewport (iOS-safe px slide, not % + scaleY).
+ * - Plaque + text on a 393×800 stage scaled with min(vw, vh).
+ * - Letters use SVG feDropShadow (CSS filter on <path> fails on iOS Chrome/Safari).
  * - onDone fires when exit starts (kick home header); onGone when fully faded.
  * - ?loop=1 on the URL replays forever for design review.
  */
@@ -20,7 +20,6 @@ import dividerSvg from '@/assets/intro/divider.svg'
 import borderOrnament from '@/assets/intro/border-top.svg'
 
 const FILL = '#DFCBC1'
-/** Faster, still readable sequence (was ~11s → ~5.8s). */
 const BORDER_MS = 480
 const SLATE_FADE_MS = 480
 const OM_FADE_MS = 520
@@ -59,16 +58,26 @@ function prepareSvg(raw: string) {
     .replace(/\sfilter="[^"]*"/g, '')
     .replace(/stroke="[^"]*"/g, '')
     .replace(/fill="[^"]*"/g, `fill="${FILL}"`)
-    .replace(/fill-opacity="[^"]*"/g, 'fill-opacity="0.85"')
+    .replace(/fill-opacity="[^"]*"/g, 'fill-opacity="0.9"')
 }
 
-type Glyph = { el: SVGPathElement; weight: number }
+/** SVG filters — CSS drop-shadow on <path> is ignored on many iOS browsers. */
+const FILTER_DEFS = (uid: string) => `
+<defs>
+  <filter id="${uid}-shadow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+    <feDropShadow dx="0" dy="2.5" stdDeviation="2" flood-color="#1a0f0a" flood-opacity="0.9"/>
+  </filter>
+  <filter id="${uid}-glow" x="-120%" y="-120%" width="340%" height="340%" color-interpolation-filters="sRGB">
+    <feDropShadow dx="0" dy="0" stdDeviation="1.8" flood-color="#FFFFFF" flood-opacity="1"/>
+    <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#FFE8D0" flood-opacity="1"/>
+    <feDropShadow dx="0" dy="0" stdDeviation="9" flood-color="#DFCBC1" flood-opacity="0.85"/>
+    <feDropShadow dx="0" dy="2.5" stdDeviation="2" flood-color="#1a0f0a" flood-opacity="0.9"/>
+  </filter>
+</defs>`
 
-const SHADOW_CSS = 'drop-shadow(0 3px 3px rgba(0,0,0,0.9))'
-const GLOW_CSS =
-  'drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px #FFE8D0) drop-shadow(0 0 14px rgba(255,232,208,0.95)) drop-shadow(0 3px 3px rgba(0,0,0,0.9))'
+type Glyph = { el: SVGPathElement; weight: number; shadow: string; glow: string }
 
-function prepLine(host: HTMLDivElement, raw: string, _uid: string): Glyph[] {
+function prepLine(host: HTMLDivElement, raw: string, uid: string): Glyph[] {
   host.innerHTML = prepareSvg(raw)
   const svg = host.querySelector('svg')
   if (!svg) return []
@@ -77,7 +86,12 @@ function prepLine(host: HTMLDivElement, raw: string, _uid: string): Glyph[] {
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   svg.style.display = 'block'
   svg.style.overflow = 'visible'
+  if (!svg.querySelector('defs')) {
+    svg.insertAdjacentHTML('afterbegin', FILTER_DEFS(uid))
+  }
 
+  const shadow = `url(#${uid}-shadow)`
+  const glow = `url(#${uid}-glow)`
   const paths = [...svg.querySelectorAll('path')]
   paths.sort((a, b) => {
     try { return a.getBBox().x - b.getBBox().x }
@@ -91,8 +105,9 @@ function prepLine(host: HTMLDivElement, raw: string, _uid: string): Glyph[] {
     el.style.fill = FILL
     el.style.stroke = 'none'
     el.style.opacity = '0'
-    el.style.filter = SHADOW_CSS
-    return { el, weight }
+    el.style.filter = 'none'
+    el.setAttribute('filter', shadow)
+    return { el, weight, shadow, glow }
   })
 }
 
@@ -108,7 +123,7 @@ function paintLine(glyphs: Glyph[], localT: number) {
     const appear = easeInOut(local)
     g.el.style.opacity = String(appear)
     const glowAmt = glowEnvelope(local) * appear
-    g.el.style.filter = glowAmt > 0.08 ? GLOW_CSS : SHADOW_CSS
+    g.el.setAttribute('filter', glowAmt > 0.08 ? g.glow : g.shadow)
   }
 }
 
@@ -116,7 +131,7 @@ function clearLines(refs: React.MutableRefObject<Glyph[]>[]) {
   for (const r of refs) {
     for (const g of r.current) {
       g.el.style.opacity = '0'
-      g.el.style.filter = SHADOW_CSS
+      g.el.setAttribute('filter', g.shadow)
     }
   }
 }
@@ -171,9 +186,16 @@ function preload(src: string) {
   })
 }
 
+function viewportSize() {
+  const vv = window.visualViewport
+  return {
+    w: Math.min(vv?.width ?? window.innerWidth, 480),
+    h: vv?.height ?? window.innerHeight,
+  }
+}
+
 /**
  * Figma 334:29498 — scaled to fit any viewport.
- * borders → plaque → Om → dividers → letters (glow+shadow) → hold → exit.
  */
 export default function ShlokaIntro({
   ready,
@@ -203,6 +225,10 @@ export default function ShlokaIntro({
   const [textOpacity, setTextOpacity] = useState(0)
   const [exitT, setExitT] = useState(0)
   const [scale, setScale] = useState(1)
+  const [borderPx, setBorderPx] = useState(56)
+  const [shellH, setShellH] = useState(
+    () => (typeof window !== 'undefined' ? viewportSize().h : 800),
+  )
 
   const doneRef = useRef(false)
   const goneRef = useRef(false)
@@ -217,11 +243,10 @@ export default function ShlokaIntro({
 
   useEffect(() => {
     const fit = () => {
-      const vv = window.visualViewport
-      const w = Math.min(vv?.width ?? window.innerWidth, 480)
-      const h = vv?.height ?? window.innerHeight
-      // Fit design stage; never exceed viewport so both ornaments stay on-screen
+      const { w, h } = viewportSize()
+      setShellH(h)
       setScale(Math.min(w / DESIGN_W, h / DESIGN_H))
+      setBorderPx(Math.max(48, Math.min(72, h * 0.09)))
     }
     fit()
     window.addEventListener('resize', fit)
@@ -376,19 +401,21 @@ export default function ShlokaIntro({
     return () => cancelAnimationFrame(raf)
   }, [phase, cycle])
 
-  const topY = -100 + 100 * borderT
-  const botY = 100 - 100 * borderT
   const rootOpacity = 1 - exitT
-  // Viewport-relative ornament height so both edges stay visible on short phones
-  const borderH = `max(40px, min(72px, 8.5svh))`
+  // Pixel slides — % translateY on bottom:0 is flaky on iOS Chrome
+  const topShift = (1 - borderT) * -borderPx
+  const botShift = (1 - borderT) * borderPx
 
   return (
     <div
-      className="absolute inset-0 z-50 overflow-hidden"
+      className="absolute left-0 right-0 top-0 z-50 overflow-hidden"
       style={{
+        height: shellH,
+        maxHeight: '100%',
         background: 'linear-gradient(to bottom, #f5eae6 0%, #ffffff 51.671%, #f8f0ed 100%)',
         opacity: rootOpacity,
         pointerEvents: phase === 'exit' ? 'none' : undefined,
+        boxSizing: 'border-box',
       }}
       role="status"
       aria-label="Loading"
@@ -401,13 +428,12 @@ export default function ShlokaIntro({
         }
       `}</style>
 
-      {/* Borders live on the real viewport — not the scaled stage — so neither edge clips away */}
       <div
         className="pointer-events-none absolute left-0 right-0 top-0 z-20"
         data-name="borderTop"
         style={{
-          height: borderH,
-          transform: `translateY(${topY}%)`,
+          height: borderPx,
+          transform: `translate3d(0, ${topShift}px, 0)`,
           opacity: assetsReady ? 1 : 0,
           willChange: 'transform',
         }}
@@ -423,26 +449,30 @@ export default function ShlokaIntro({
       </div>
 
       <div
-        className="pointer-events-none absolute left-0 right-0 bottom-0 z-20"
+        className="pointer-events-none absolute left-0 right-0 z-20"
         data-name="borderBottom"
         style={{
-          height: borderH,
-          transform: `translateY(${botY}%)`,
+          height: borderPx,
+          // Above home indicator / browser chrome — bottom:0 sits under the notch bar on iPhone
+          bottom: 'env(safe-area-inset-bottom, 0px)',
+          transform: `translate3d(0, ${botShift}px, 0)`,
           opacity: assetsReady ? 1 : 0,
           willChange: 'transform',
         }}
         aria-hidden
       >
-        <img
-          src={borderOrnament}
-          alt=""
-          className="block size-full"
-          style={{ objectFit: 'fill', transform: 'scaleY(-1)' }}
-          draggable={false}
-        />
+        {/* Flip via wrapper — scaleY on <img> often paints blank on iOS */}
+        <div className="size-full" style={{ transform: 'scaleY(-1)', transformOrigin: 'center center' }}>
+          <img
+            src={borderOrnament}
+            alt=""
+            className="block size-full"
+            style={{ objectFit: 'fill' }}
+            draggable={false}
+          />
+        </div>
       </div>
 
-      {/* Design-locked stage — scales to fit any phone height/width */}
       <div className="absolute inset-0 flex items-center justify-center z-10">
         <div
           className="relative shrink-0"
@@ -541,6 +571,11 @@ export default function ShlokaIntro({
                 className="absolute inset-0 flex flex-col items-center justify-center overflow-visible"
                 data-name="shlokaText"
                 style={{
+                  // CSS drop-shadow survives iOS Chrome/Safari where SVG feDropShadow often doesn't paint
+                  filter:
+                    textOpacity > 0.05
+                      ? 'drop-shadow(0px 2.5px 2px rgba(26,15,10,0.88)) drop-shadow(0px 0px 3px rgba(255,255,255,0.95)) drop-shadow(0px 0px 8px rgba(255,232,208,0.9)) drop-shadow(0px 0px 14px rgba(223,203,193,0.75))'
+                      : undefined,
                   padding: '22% 12%',
                   gap: 6,
                   opacity: textOpacity,
