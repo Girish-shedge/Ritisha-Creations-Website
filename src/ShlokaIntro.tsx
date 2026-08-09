@@ -1,3 +1,13 @@
+/**
+ * Boot shloka overlay (home only).
+ *
+ * Phase order: borders → plaque (slate) → Om → dividers → letter reveal → hold → exit.
+ * - Borders are pinned to the real viewport so both edges stay visible on short phones.
+ * - Plaque + text live on a 393×800 stage scaled with min(vw, vh).
+ * - Letters use CSS drop-shadow for glow/shadow (reliable on mobile).
+ * - onDone fires when exit starts (kick home header); onGone when fully faded.
+ * - ?loop=1 on the URL replays forever for design review.
+ */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import line1Svg from '@/assets/intro/line1.svg?raw'
 import line2Svg from '@/assets/intro/line2.svg?raw'
@@ -10,22 +20,22 @@ import dividerSvg from '@/assets/intro/divider.svg'
 import borderOrnament from '@/assets/intro/border-top.svg'
 
 const FILL = '#DFCBC1'
-const BORDER_MS = 900
-const SLATE_FADE_MS = 900
-const OM_FADE_MS = 1000
-const DIVIDER_MS = 900
-const LINE_MS = 1400
+/** Faster, still readable sequence (was ~11s → ~5.8s). */
+const BORDER_MS = 480
+const SLATE_FADE_MS = 480
+const OM_FADE_MS = 520
+const DIVIDER_MS = 480
+const LINE_MS = 720
 const DRAW_MS = LINE_MS * 4
-const HOLD_MS = 1200
-const EXIT_MS = 800
-const LOOP_GAP_MS = 700
-const OM_SPIN_S = 48
-/** Figma ~8%; dark-on-black asset needs invert + higher opacity to read as a watermark. */
-const OM_OPACITY = 0.28
-/** Steady letter drop-shadow (glow is layered on top while appearing). */
-const LETTER_SHADOW = 'drop-shadow(0px 1.5px 2px rgba(48, 30, 21, 0.55))'
+const HOLD_MS = 550
+const EXIT_MS = 420
+const LOOP_GAP_MS = 400
+const OM_SPIN_S = 40
+const OM_OPACITY = 0.32
 
-/** Figma frame size + optional overflow inset % [top, right, bottom, left] for shadow bleed. */
+const DESIGN_W = 393
+const DESIGN_H = 800
+
 const LINES = [
   { raw: line1Svg, width: 249.942, height: 37.915 },
   { raw: line2Svg, width: 237.065, height: 51.431, inset: [-5.83, -2.53, -17.5, -2.53] },
@@ -33,38 +43,38 @@ const LINES = [
   { raw: line4Svg, width: 228.916, height: 51.899, inset: [-5.78, -2.62, -17.34, -2.62] },
 ] as const
 
-/** borders → slate → om → dividers → text → hold → exit fade */
 type Phase = 'borders' | 'slate' | 'om' | 'dividers' | 'text' | 'hold' | 'exit'
 
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
 }
 
-/** 0→1→0 ease for appear-glow (peaks mid-reveal, then fades out). */
 function glowEnvelope(local: number) {
-  const u = Math.max(0, Math.min(1, local))
-  return Math.sin(u * Math.PI)
+  return Math.sin(Math.max(0, Math.min(1, local)) * Math.PI)
 }
 
 function prepareSvg(raw: string) {
-  // Strip baked Figma drop-shadow filters — they expand the viewBox and crop glyphs.
   return raw
     .replace(/<defs[\s\S]*?<\/defs>/gi, '')
     .replace(/\sfilter="[^"]*"/g, '')
     .replace(/stroke="[^"]*"/g, '')
     .replace(/fill="[^"]*"/g, `fill="${FILL}"`)
-    .replace(/fill-opacity="[^"]*"/g, 'fill-opacity="0.75"')
+    .replace(/fill-opacity="[^"]*"/g, 'fill-opacity="0.85"')
 }
 
 type Glyph = { el: SVGPathElement; weight: number }
 
-function prepLine(host: HTMLDivElement, raw: string): Glyph[] {
+const SHADOW_CSS = 'drop-shadow(0 3px 3px rgba(0,0,0,0.9))'
+const GLOW_CSS =
+  'drop-shadow(0 0 2px #fff) drop-shadow(0 0 6px #FFE8D0) drop-shadow(0 0 14px rgba(255,232,208,0.95)) drop-shadow(0 3px 3px rgba(0,0,0,0.9))'
+
+function prepLine(host: HTMLDivElement, raw: string, _uid: string): Glyph[] {
   host.innerHTML = prepareSvg(raw)
   const svg = host.querySelector('svg')
   if (!svg) return []
   svg.setAttribute('width', '100%')
   svg.setAttribute('height', '100%')
-  svg.setAttribute('preserveAspectRatio', 'none')
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet')
   svg.style.display = 'block'
   svg.style.overflow = 'visible'
 
@@ -81,7 +91,7 @@ function prepLine(host: HTMLDivElement, raw: string): Glyph[] {
     el.style.fill = FILL
     el.style.stroke = 'none'
     el.style.opacity = '0'
-    el.style.filter = LETTER_SHADOW
+    el.style.filter = SHADOW_CSS
     return { el, weight }
   })
 }
@@ -97,19 +107,8 @@ function paintLine(glyphs: Glyph[], localT: number) {
     const local = Math.max(0, Math.min(1, (t - start) / (end - start || 1)))
     const appear = easeInOut(local)
     g.el.style.opacity = String(appear)
-
-    const glow = glowEnvelope(local) * appear
-    if (glow > 0.02) {
-      const blur = 2 + glow * 6
-      const soft = 6 + glow * 10
-      g.el.style.filter = [
-        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.95 * glow}))`,
-        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.55 * glow}))`,
-        LETTER_SHADOW,
-      ].join(' ')
-    } else {
-      g.el.style.filter = LETTER_SHADOW
-    }
+    const glowAmt = glowEnvelope(local) * appear
+    g.el.style.filter = glowAmt > 0.08 ? GLOW_CSS : SHADOW_CSS
   }
 }
 
@@ -117,7 +116,7 @@ function clearLines(refs: React.MutableRefObject<Glyph[]>[]) {
   for (const r of refs) {
     for (const g of r.current) {
       g.el.style.opacity = '0'
-      g.el.style.filter = LETTER_SHADOW
+      g.el.style.filter = SHADOW_CSS
     }
   }
 }
@@ -137,9 +136,9 @@ function ShlokaLine({
   useLayoutEffect(() => {
     const root = host.current
     if (!root) return
-    glyphsRef.current = prepLine(root, raw)
+    glyphsRef.current = prepLine(root, raw, name)
     return () => { glyphsRef.current = [] }
-  }, [raw, glyphsRef])
+  }, [raw, glyphsRef, name])
 
   const [t, r, b, l] = inset ?? [0, 0, 0, 0]
 
@@ -157,12 +156,7 @@ function ShlokaLine({
       <div
         ref={host}
         className="absolute"
-        style={{
-          top: `${t}%`,
-          right: `${r}%`,
-          bottom: `${b}%`,
-          left: `${l}%`,
-        }}
+        style={{ top: `${t}%`, right: `${r}%`, bottom: `${b}%`, left: `${l}%` }}
       />
     </div>
   )
@@ -178,8 +172,8 @@ function preload(src: string) {
 }
 
 /**
- * Figma 334:29498 — borders → plaque → Om → dividers → letters →
- * hold → fade out (onDone at fade start so home header can begin).
+ * Figma 334:29498 — scaled to fit any viewport.
+ * borders → plaque → Om → dividers → letters (glow+shadow) → hold → exit.
  */
 export default function ShlokaIntro({
   ready,
@@ -188,11 +182,8 @@ export default function ShlokaIntro({
   loop = false,
 }: {
   ready: boolean
-  /** Fired when exit fade begins — start home header concurrently. */
   onDone: () => void
-  /** Fired when exit fade finishes — unmount the intro. */
   onGone?: () => void
-  /** When true, replay forever (no handoff to home). */
   loop?: boolean
 }) {
   const line1Ref = useRef<Glyph[]>([])
@@ -211,6 +202,7 @@ export default function ShlokaIntro({
   const [dividerScale, setDividerScale] = useState(0)
   const [textOpacity, setTextOpacity] = useState(0)
   const [exitT, setExitT] = useState(0)
+  const [scale, setScale] = useState(1)
 
   const doneRef = useRef(false)
   const goneRef = useRef(false)
@@ -222,6 +214,25 @@ export default function ShlokaIntro({
   onDoneRef.current = onDone
   const onGoneRef = useRef(onGone)
   onGoneRef.current = onGone
+
+  useEffect(() => {
+    const fit = () => {
+      const vv = window.visualViewport
+      const w = Math.min(vv?.width ?? window.innerWidth, 480)
+      const h = vv?.height ?? window.innerHeight
+      // Fit design stage; never exceed viewport so both ornaments stay on-screen
+      setScale(Math.min(w / DESIGN_W, h / DESIGN_H))
+    }
+    fit()
+    window.addEventListener('resize', fit)
+    window.visualViewport?.addEventListener('resize', fit)
+    window.visualViewport?.addEventListener('scroll', fit)
+    return () => {
+      window.removeEventListener('resize', fit)
+      window.visualViewport?.removeEventListener('resize', fit)
+      window.visualViewport?.removeEventListener('scroll', fit)
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -237,7 +248,6 @@ export default function ShlokaIntro({
     return () => { cancelled = true }
   }, [])
 
-  // Reset visual state each loop cycle
   useEffect(() => {
     setPhase('borders')
     setBorderT(0)
@@ -253,7 +263,6 @@ export default function ShlokaIntro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle])
 
-  // 1) Borders slide in (ease-in-out)
   useEffect(() => {
     if (!assetsReady || phase !== 'borders') return
     const t0 = performance.now()
@@ -261,18 +270,13 @@ export default function ShlokaIntro({
     const tick = (now: number) => {
       const u = Math.min(1, (now - t0) / BORDER_MS)
       setBorderT(easeInOut(u))
-      if (u >= 1) {
-        setBorderT(1)
-        setPhase('slate')
-        return
-      }
+      if (u >= 1) { setBorderT(1); setPhase('slate'); return }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [assetsReady, phase, cycle])
 
-  // 2) Plaque inner + outer fade in first
   useEffect(() => {
     if (phase !== 'slate') return
     const t0 = performance.now()
@@ -280,18 +284,13 @@ export default function ShlokaIntro({
     const tick = (now: number) => {
       const u = Math.min(1, (now - t0) / SLATE_FADE_MS)
       setSlateOpacity(easeInOut(u))
-      if (u >= 1) {
-        setSlateOpacity(1)
-        setPhase('om')
-        return
-      }
+      if (u >= 1) { setSlateOpacity(1); setPhase('om'); return }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [phase, cycle])
 
-  // 3) Om fades in behind the plaque, then slow infinite rotation
   useEffect(() => {
     if (phase !== 'om') return
     const t0 = performance.now()
@@ -299,19 +298,13 @@ export default function ShlokaIntro({
     const tick = (now: number) => {
       const u = Math.min(1, (now - t0) / OM_FADE_MS)
       setOmOpacity(easeInOut(u))
-      if (u >= 1) {
-        setOmOpacity(1)
-        setOmSpin(true)
-        setPhase('dividers')
-        return
-      }
+      if (u >= 1) { setOmOpacity(1); setOmSpin(true); setPhase('dividers'); return }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [phase, cycle])
 
-  // 4) Both decorative lines grow from center → left & right
   useEffect(() => {
     if (phase !== 'dividers') return
     const t0 = performance.now()
@@ -319,36 +312,27 @@ export default function ShlokaIntro({
     const tick = (now: number) => {
       const u = Math.min(1, (now - t0) / DIVIDER_MS)
       setDividerScale(easeInOut(u))
-      if (u >= 1) {
-        setDividerScale(1)
-        setPhase('text')
-        return
-      }
+      if (u >= 1) { setDividerScale(1); setPhase('text'); return }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [phase, cycle])
 
-  // 5) Letters appear with ease-in-out + glow that fades out
   useEffect(() => {
     if (phase !== 'text') return
     const t0 = performance.now()
     let raf = 0
     const tick = (now: number) => {
       const elapsed = now - t0
-      setTextOpacity(easeInOut(Math.min(1, elapsed / 280)))
+      setTextOpacity(easeInOut(Math.min(1, elapsed / 200)))
       for (let i = 0; i < 4; i++) {
         const start = i * LINE_MS
         if (elapsed < start) paintLine(lineRefs[i].current, 0)
         else if (elapsed < start + LINE_MS) paintLine(lineRefs[i].current, (elapsed - start) / LINE_MS)
         else paintLine(lineRefs[i].current, 1)
       }
-      if (elapsed >= DRAW_MS) {
-        setTextOpacity(1)
-        setPhase('hold')
-        return
-      }
+      if (elapsed >= DRAW_MS) { setTextOpacity(1); setPhase('hold'); return }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -356,7 +340,6 @@ export default function ShlokaIntro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, cycle])
 
-  // Hold → loop, or begin exit when ready
   useEffect(() => {
     if (phase !== 'hold') return
     if (loopRef.current) {
@@ -368,7 +351,6 @@ export default function ShlokaIntro({
     return () => clearTimeout(t)
   }, [phase, ready, cycle])
 
-  // Exit fade — onDone at start (home header), onGone when fully clear
   useEffect(() => {
     if (phase !== 'exit') return
     if (!doneRef.current) {
@@ -397,6 +379,8 @@ export default function ShlokaIntro({
   const topY = -100 + 100 * borderT
   const botY = 100 - 100 * borderT
   const rootOpacity = 1 - exitT
+  // Viewport-relative ornament height so both edges stay visible on short phones
+  const borderH = `max(40px, min(72px, 8.5svh))`
 
   return (
     <div
@@ -417,150 +401,164 @@ export default function ShlokaIntro({
         }
       `}</style>
 
-      {/* omCircle — behind plaque; fades in after slate */}
+      {/* Borders live on the real viewport — not the scaled stage — so neither edge clips away */}
       <div
-        className="pointer-events-none absolute left-1/2 top-1/2"
-        data-name="omCircle"
-        style={{
-          width: 'min(170vw, 668px)',
-          height: 'min(170vw, 668px)',
-          opacity: omOpacity * OM_OPACITY,
-          animation: omSpin ? `om-spin ${OM_SPIN_S}s linear infinite` : undefined,
-          transform: omSpin ? undefined : 'translate(-50%, -50%)',
-          willChange: omSpin ? 'transform' : undefined,
-        }}
-        aria-hidden
-      >
-        <img
-          src={omCircle}
-          alt=""
-          className="block size-full object-cover"
-          style={{ filter: 'invert(1)' }}
-          draggable={false}
-        />
-      </div>
-
-      {/* borderTop / borderBottom — same ornament; bottom is a vertical flip of top */}
-      <div
-        className="pointer-events-none absolute left-0 right-0 top-0"
+        className="pointer-events-none absolute left-0 right-0 top-0 z-20"
         data-name="borderTop"
         style={{
-          height: '7.87%',
+          height: borderH,
           transform: `translateY(${topY}%)`,
           opacity: assetsReady ? 1 : 0,
+          willChange: 'transform',
         }}
         aria-hidden
       >
         <img
           src={borderOrnament}
           alt=""
-          className="block size-full object-cover object-top"
-          style={{ transform: 'rotate(180deg)' }}
+          className="block size-full"
+          style={{ objectFit: 'fill', transform: 'rotate(180deg)' }}
           draggable={false}
         />
       </div>
+
       <div
-        className="pointer-events-none absolute left-0 right-0 bottom-0"
+        className="pointer-events-none absolute left-0 right-0 bottom-0 z-20"
         data-name="borderBottom"
         style={{
-          height: '7.87%',
-          transform: `translateY(${botY}%) scaleY(-1)`,
+          height: borderH,
+          transform: `translateY(${botY}%)`,
           opacity: assetsReady ? 1 : 0,
+          willChange: 'transform',
         }}
         aria-hidden
       >
         <img
           src={borderOrnament}
           alt=""
-          className="block size-full object-cover object-top"
-          style={{ transform: 'rotate(180deg)' }}
+          className="block size-full"
+          style={{ objectFit: 'fill', transform: 'scaleY(-1)' }}
           draggable={false}
         />
       </div>
 
-      {/* plaqueOuter + plaqueInner + dividers + shlokaText */}
-      <div className="absolute inset-0 flex items-center justify-center px-4">
+      {/* Design-locked stage — scales to fit any phone height/width */}
+      <div className="absolute inset-0 flex items-center justify-center z-10">
         <div
-          className="relative w-full"
-          data-name="plaque"
+          className="relative shrink-0"
           style={{
-            maxWidth: 366,
-            aspectRatio: '365.637 / 437.884',
-            opacity: slateOpacity,
+            width: DESIGN_W,
+            height: DESIGN_H,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
           }}
         >
-          <img
-            src={plaqueOuter}
-            alt=""
-            aria-hidden
-            data-name="plaqueOuter"
-            className="absolute inset-0 size-full object-contain pointer-events-none"
-            draggable={false}
-          />
-          <img
-            src={plaqueInner}
-            alt=""
-            aria-hidden
-            data-name="plaqueInner"
-            className="absolute pointer-events-none"
-            style={{
-              left: '2.9%',
-              top: '2.9%',
-              width: '94.2%',
-              height: '94.2%',
-              objectFit: 'contain',
-            }}
-            draggable={false}
-          />
-
           <div
-            className="absolute left-1/2 pointer-events-none"
-            data-name="dividerTop"
+            className="pointer-events-none absolute left-1/2 top-1/2"
+            data-name="omCircle"
             style={{
-              top: '16.4%',
-              width: '41.2%',
-              transform: `translateX(-50%) scaleX(${dividerScale})`,
-              transformOrigin: 'center center',
+              width: 668,
+              height: 668,
+              opacity: omOpacity * OM_OPACITY,
+              animation: omSpin ? `om-spin ${OM_SPIN_S}s linear infinite` : undefined,
+              transform: omSpin ? undefined : 'translate(-50%, -50%)',
+              willChange: omSpin ? 'transform' : undefined,
             }}
             aria-hidden
           >
-            <img src={dividerSvg} alt="" className="block w-full h-auto" draggable={false} />
+            <img
+              src={omCircle}
+              alt=""
+              className="block size-full object-cover"
+              style={{ filter: 'invert(1)' }}
+              draggable={false}
+            />
           </div>
 
-          <div
-            className="absolute left-1/2 pointer-events-none"
-            data-name="dividerBottom"
-            style={{
-              bottom: '16.4%',
-              width: '41.2%',
-              transform: `translateX(-50%) scaleX(${dividerScale})`,
-              transformOrigin: 'center center',
-            }}
-            aria-hidden
-          >
-            <img src={dividerSvg} alt="" className="block w-full h-auto" draggable={false} />
-          </div>
-
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center overflow-visible"
-            data-name="shlokaText"
-            style={{
-              padding: '22% 12%',
-              gap: 6,
-              opacity: textOpacity,
-            }}
-          >
-            {LINES.map((line, i) => (
-              <ShlokaLine
-                key={i}
-                raw={line.raw}
-                glyphsRef={lineRefs[i]}
-                width={line.width}
-                height={line.height}
-                name={`line${i + 1}`}
-                inset={'inset' in line ? line.inset : undefined}
+          <div className="absolute inset-0 flex items-center justify-center px-4">
+            <div
+              className="relative w-full"
+              data-name="plaque"
+              style={{
+                maxWidth: 366,
+                aspectRatio: '365.637 / 437.884',
+                opacity: slateOpacity,
+              }}
+            >
+              <img
+                src={plaqueOuter}
+                alt=""
+                aria-hidden
+                data-name="plaqueOuter"
+                className="absolute inset-0 size-full object-contain pointer-events-none"
+                draggable={false}
               />
-            ))}
+              <img
+                src={plaqueInner}
+                alt=""
+                aria-hidden
+                data-name="plaqueInner"
+                className="absolute pointer-events-none"
+                style={{
+                  left: '2.9%',
+                  top: '2.9%',
+                  width: '94.2%',
+                  height: '94.2%',
+                  objectFit: 'contain',
+                }}
+                draggable={false}
+              />
+
+              <div
+                className="absolute left-1/2 pointer-events-none"
+                data-name="dividerTop"
+                style={{
+                  top: '16.4%',
+                  width: '41.2%',
+                  transform: `translateX(-50%) scaleX(${dividerScale})`,
+                  transformOrigin: 'center center',
+                }}
+                aria-hidden
+              >
+                <img src={dividerSvg} alt="" className="block w-full h-auto" draggable={false} />
+              </div>
+
+              <div
+                className="absolute left-1/2 pointer-events-none"
+                data-name="dividerBottom"
+                style={{
+                  bottom: '16.4%',
+                  width: '41.2%',
+                  transform: `translateX(-50%) scaleX(${dividerScale})`,
+                  transformOrigin: 'center center',
+                }}
+                aria-hidden
+              >
+                <img src={dividerSvg} alt="" className="block w-full h-auto" draggable={false} />
+              </div>
+
+              <div
+                className="absolute inset-0 flex flex-col items-center justify-center overflow-visible"
+                data-name="shlokaText"
+                style={{
+                  padding: '22% 12%',
+                  gap: 6,
+                  opacity: textOpacity,
+                }}
+              >
+                {LINES.map((line, i) => (
+                  <ShlokaLine
+                    key={i}
+                    raw={line.raw}
+                    glyphsRef={lineRefs[i]}
+                    width={line.width}
+                    height={line.height}
+                    name={`line${i + 1}`}
+                    inset={'inset' in line ? line.inset : undefined}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

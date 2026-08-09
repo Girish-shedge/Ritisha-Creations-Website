@@ -12,3 +12,7 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
+# Unused Figma Make dumps (not part of the running app)
+.figma/
+/imports/
+src/imports/

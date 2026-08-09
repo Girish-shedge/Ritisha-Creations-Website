@@ -1,6 +1,10 @@
-# Rittisha Creations — Decoration Showcase
+# Rittisha Creations — behaviour contract
 
-Mobile-first decoration showcase (max-width 480px). React 19 + Vite 8 + Tailwind CSS v4. Live: https://rittishacreations.vercel.app
+Mobile-first decoration showcase (max-width **480px**).  
+Stack: React 19 + Vite 8 + Tailwind CSS v4.  
+Live: https://rittishacreations.vercel.app
+
+This file is the **product/behaviour** source of truth. For “how to run / where is the code?”, see `README.md`.
 
 ---
 
@@ -15,58 +19,58 @@ Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer 
 
 ## Content source (Google Drive)
 
-**Root folder:** [Rittisha Creations Drive](https://drive.google.com/drive/folders/1blEF1JY8k4fGg66R_O1ZcSyN6wFHz9W8) (`VITE_DRIVE_FOLDER_ID`)
+**Root folder id:** `VITE_DRIVE_FOLDER_ID` (see `.env.example`)
 
 | Drive | App |
 |-------|-----|
 | Subfolder name | Category title + slug (`/modak-pushp-backdrop`) |
-| Files named `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = share/OG cover |
+| Files `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = share / OG cover |
 | Empty / non-image folders | Skipped |
 
-- Fetched on **every page load** via Google Drive API (`VITE_GOOGLE_DRIVE_API_KEY`).
-- Home uses **w640** thumbs; gallery uses **w1200**; placeholder until first load, then session-cached (no flash on revisit).
-- Parallel folder fetches; warm thumbs + fulls after catalogue load (same page session).
-- On API failure: last cached catalogue (`localStorage` `ritisha.driveCatalogue.v2`).
-- Share proxy: `/api/media?id=` (Vercel + Vite dev middleware).
+- Listed on **every page load** via `GET /api/catalogue` (server sets Referer for Drive).
+- Home thumbs **w640**; gallery **w1200**; cream placeholder until decode; session `imgReady` cache.
+- On API failure: `localStorage` key `ritisha.driveCatalogue.v4`.
+- Image fallback proxy: `/api/media?id=`.
 
-Deep links: `https://rittishacreations.vercel.app/{slug}` opens that gallery. SPA rewrite in `vercel.json`. Old host `ritishacreations.vercel.app` redirects here.
+Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `vercel.json`.
 
 ---
 
 ## Screens
 
 ### Home
-- Sticky blue wave header — "Rittisha Creations" flanked by swastik icons (stroke → fill → text intro once per load)
-- Category cards — **1:1** corner-cut frame + horizontal scroller (autoplay only after card in view **≥1s**; swipe left/right to override); dots morph **4→12×4 pill** together; title overlay uses progressive blur **0→4** (top→bottom)
-- **"View all photos"** fixed full-width button — rotates with **“Prices starting from ₹499”** only after the card has been in view **≥1s** (same arming as image autoplay); opens gallery (card image is not a tap target)
-- Simple vertical list (no scroll scale/opacity); back from gallery restores scroll position (same session)
-- End badge: Handcrafted / & made with love (Figma `326:261`, padding 24/25)
+- Sticky blue wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home)
+- Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥1s** mostly in view); swipe overrides; dots **4→12×4**
+- Title overlay: progressive blur **0→4** (top→bottom) + dark scrim
+- **View all photos** ↔ **Prices starting from ₹499** (arms with the same ≥1s in-view rule)
+- End badge: Handcrafted / & made with love (padding top 24 / bottom **40**)
 - Site `bg.png` at **75%** opacity
 - No green WhatsApp footer on Home
 
 ### Gallery
-- Overlay Figma nav: slides in from top (ease-in-out); black gradient @25% + progressive blur 4→0; circular back/share; white truncated title
-- Share: `Hey, check out this amazing piece by *Rittisha Creations*` + single category URL (no duplicate `url` field); Image 1 prefetched for faster sheet
-- Edge-to-edge **1:1** photos, **16px** gap (flush under overlay nav + footer); session image cache skips placeholders on revisit
-- Footer chrome intro (stroke → fill → text) each open; images warm in parallel
-- Sticky green footer — after chrome intro completes, wait **1s**, then rotates **“DM us for more information”** ↔ **“Customization also available”** (same slide-up text animation as home buttons)
-- Site `bg.png` at **75%** opacity
+- Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
+- Circular back / share; truncated white title
+- Share copy + category URL; Image 1 prefetched
+- Edge-to-edge **1:1** photos, **16px** gap; `paddingBottom` = footer height
+- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step)
+- After intro + **1s**, rotates **DM us for more information** ↔ **Customization also available**
 
-Navigation: History API paths + 280ms fade. Back → `/`.
+Navigation: History API + **280ms** fade. Back → `/`.
 
 ---
 
 ## Intro
 
-### Shloka boot (first home load)
-Solid white (no pattern). Wooden plaque scales **110%→100%** (~1.4s ease-in-out), then four Devanagari lines fill left→right (~1.6s each, soft ease-in-out, `#DFCBC1` @75%). Pulse until fonts + Drive catalogue are ready. Plaque **slides up** (~0.8s) revealing home; then header stroke→fill→text starts. Skipped on category deep links. Silent (no audio).
+### Shloka (`ShlokaIntro.tsx`) — first home load only
+Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow) → hold → exit**.  
+Viewport-pinned ornaments; plaque stage scales to fit. Skipped on `/{slug}` deep links.  
+`?loop=1` replays forever (review). `onDone` starts home header; `onGone` unmounts overlay.
 
-### Home header (once per page load after shloka)
-Stroke centre → left/right; fill waits for `transitionend` on `stroke-dashoffset`; then text.  
-`introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay on Gallery → Home.
+### Home header — after shloka
+`introPhase`: `wait` → `trace` → `cards` → `done`. Does not replay when returning from gallery (`settleInstant`).
 
-### Gallery footer (each category open)
-Same stroke → fill → text chain on "DM us for more information".
+### Gallery footer — each category open
+Stroke → fill → text via `useChromeIntro({ skipMarks: true })`.
 
 ---
 
@@ -75,83 +79,54 @@ Same stroke → fill → text chain on "DM us for more information".
 | Token | Value |
 |-------|-------|
 | `FONT_BOLD` | `'Season Mix-TRIAL:Bold', 'Poppins', sans-serif` |
-| `FS_HEAD` | 36px |
-| `FS_CHROME` | 16px |
-| weights | 780 Bold, 670 SemiBold (font file present) |
+| `FONT_SEMI` | `'Season Mix-TRIAL:SemiBold', 'Poppins', sans-serif` |
+| `FS_HEAD` | 36 |
+| `FS_CHROME` | 16 |
+| weights | 780 Bold, 670 SemiBold |
+
+Fonts: `/public/fonts/Season_Mix-TRIAL-*.woff2` wired in `src/index.css`.
 
 ---
 
-## SVG / layout constants (in `App.tsx`)
+## Geometry (in `App.tsx`)
 
-`HEADER`, `HEADER_LEFT`, `HEADER_RIGHT` — blue header (bump down)  
-`FOOTER`, `FOOTER_LEFT`, `FOOTER_RIGHT` — green footer (bump up)  
-`CARD_OVERLAY`, `CARD_FRAME`  
-`WAVE_AR = 393/87.3859`
-
-Backdrop blur is clipped to the SVG shape via `foreignObject` + `clipPath` (`pad = 12`).
+`HEADER` / `HEADER_LEFT` / `HEADER_RIGHT` — blue (bump down)  
+`FOOTER` / `FOOTER_LEFT` / `FOOTER_RIGHT` — green (bump up)  
+`CARD_OVERLAY`, `CARD_FRAME`, `CARD_FRAME_MASK`  
+`WAVE_AR = 393 / 87.3859`
 
 ---
 
-## Content shape
+## Data shape
 
 ```ts
+interface CategoryPhoto {
+  id: string
+  name: string
+  thumb: string  // home card
+  full: string   // gallery
+}
+
 interface CategoryData {
-  id: string            // Drive folder id
-  lines: string[]       // overlay lines from folder name
+  id: string           // Drive folder id
+  slug: string
+  lines: string[]      // card title lines
   galleryTitle: string
-  photos: string[]      // Drive thumbnail URLs
+  photos: CategoryPhoto[]
+  coverId: string      // Image 1 file id
 }
 ```
 
-Site background: `src/assets/bg.png`.
-
 ---
 
-## Fonts
+## Components
 
-`/public/fonts/Season_Mix-TRIAL-Bold.woff2` and `SemiBold.woff2` — `@font-face` in `src/index.css`.
+| Piece | File | Role |
+|-------|------|------|
+| `App` | `App.tsx` | Catalogue, shloka gate, route state |
+| `ShlokaIntro` | `ShlokaIntro.tsx` | Boot animation |
+| `HomeScreen` / `GalleryScreen` | `App.tsx` | Screens |
+| `BlueHeader` / `GreenFooter` | `App.tsx` | Chrome + `useChromeIntro` |
+| `DriveImg` / cards / blur | `App.tsx` | Media + home cards |
 
----
-
-## File structure
-
-```
-src/
-  App.tsx                 — all UI
-  ShlokaIntro.tsx         — boot shloka loader
-  main.tsx
-  index.css
-  data/categories.ts      — types + localStorage cache
-  data/driveCatalogue.ts  — Drive fetch on load
-  lib/share.ts            — Web Share + media proxy
-  assets/bg.png
-  assets/placeholder.png
-  assets/intro/line1.svg, line2.svg
-public/fonts/
-api/media.js
-.env.example
-Project.md
-```
-
----
-
-## Components (all in `App.tsx` unless noted)
-
-| Component | Role |
-|-----------|------|
-| `App` | nav state, catalogue load, home introPhase, shloka gate |
-| `ShlokaIntro` | boot fill-letter animation (`ShlokaIntro.tsx`) |
-| `HomeScreen` / `GalleryScreen` | screens |
-| `BlueHeader` / `GreenFooter` | chrome |
-| `WaveBlur` | shape-clipped backdrop blur |
-| `CategoryCard` / `CardImageScroller` / `CardDots` / `GalleryPhoto` / `ViewAllButton` / `DriveImg` | content |
-
----
-
-## Behaviours
-
-- Header/footer blur when `scrollTop > 8` (after chrome intro settled)
-- "View all photos" fixed full width; CTA text rotation arms with card (≥1s in view)
-- First gallery photo `eager` + `fetchPriority="high"`; rest `lazy`; session `imgReady` cache
-- Home cards and gallery tiles forced **1:1** via `aspect-ratio: 1 / 1` + `object-cover`
-- Home card scroller: clone-first seamless loop; 3500ms dwell, 700ms `ease-in-out`
+Unused: `src/imports/**`, root `imports/**` (Figma exports — do not wire into the app).

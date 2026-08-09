@@ -1,3 +1,22 @@
+/**
+ * Rittisha Creations — all product UI in one file.
+ *
+ * READ ORDER FOR NEWCOMERS
+ * 1. README.md / Project.md — why the app exists and how behaviour works
+ * 2. App() at the bottom — catalogue load, shloka gate, home ↔ gallery nav
+ * 3. HomeScreen / GalleryScreen — the two screens
+ * 4. BlueHeader / GreenFooter / useChromeIntro — wave chrome animations
+ * 5. DriveImg / CategoryCard — images and home cards
+ *
+ * SECTION MAP (search for "──")
+ *   Design tokens / SVG paths     Header, footer, card frame geometry
+ *   useChromeIntro                Shared stroke → fill → (marks) → text
+ *   BlueHeader / GreenFooter      Sticky chrome
+ *   RotatingLines                 CTA / footer copy rotator
+ *   DriveImg / Card*              Photos, blur, scroller, category card
+ *   HomeScreen / GalleryScreen    Screens
+ *   App (default export)          Root
+ */
 import { useState, useRef, useLayoutEffect, useEffect, useCallback, useId, useMemo } from 'react'
 import {
   categoryPath,
@@ -140,29 +159,45 @@ function strokeDrawProps(opts: {
 }
 
 /**
- * stroke (bottom→top L/R) → fill fade → marks fade at center →
- * marks split + title reveal → done. Keeps final paint after play ends.
+ * stroke → fill → (optional marks) → text → done.
+ * skipMarks: gallery footer (no swastiks). settleInstant: remount home after intro.
  */
 type ChromeStep = 'stroke' | 'fill' | 'marks' | 'text' | 'done'
-function useChromeIntro(play: boolean, onComplete?: () => void) {
-  const [step, setStep] = useState<ChromeStep>('stroke')
-  const [traceGo, setTraceGo] = useState(false)
-  const strokeDone = useRef(false)
+function useChromeIntro(
+  play: boolean,
+  onComplete?: () => void,
+  opts: { settleInstant?: boolean; skipMarks?: boolean } = {},
+) {
+  const settleInstant = opts.settleInstant ?? false
+  const skipMarks = opts.skipMarks ?? false
+  const [step, setStep] = useState<ChromeStep>(settleInstant ? 'done' : 'stroke')
+  const [traceGo, setTraceGo] = useState(settleInstant)
+  const strokeDone = useRef(settleInstant)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
-  const startedRef = useRef(false)
+  const startedRef = useRef(settleInstant)
 
   useEffect(() => {
-    if (!play) return
+    if (!play) {
+      // Allow a later play=true (gallery footer) to run the sequence again
+      startedRef.current = false
+      return
+    }
     if (startedRef.current) return
     startedRef.current = true
+    if (settleInstant) {
+      strokeDone.current = true
+      setTraceGo(true)
+      setStep('done')
+      return
+    }
     strokeDone.current = false
     setTraceGo(false)
     setStep('stroke')
-  }, [play])
+  }, [play, settleInstant])
 
   useEffect(() => {
-    if (!play || step !== 'stroke') return
+    if (!play || settleInstant || step !== 'stroke') return
     strokeDone.current = false
     let id2 = 0
     const id1 = requestAnimationFrame(() => {
@@ -172,23 +207,26 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
       cancelAnimationFrame(id1)
       cancelAnimationFrame(id2)
     }
-  }, [play, step])
+  }, [play, settleInstant, step])
 
   useEffect(() => {
-    if (!play || step !== 'stroke' || !traceGo) return
+    if (!play || settleInstant || step !== 'stroke' || !traceGo) return
     const t = window.setTimeout(() => {
       if (strokeDone.current) return
       strokeDone.current = true
       setStep('fill')
     }, T_TRACE_DUR + 80)
     return () => clearTimeout(t)
-  }, [play, step, traceGo])
+  }, [play, settleInstant, step, traceGo])
 
   useEffect(() => {
     if (step !== 'fill') return
-    const t = window.setTimeout(() => setStep('marks'), T_FILL_DUR)
+    const t = window.setTimeout(
+      () => setStep(skipMarks ? 'text' : 'marks'),
+      T_FILL_DUR,
+    )
     return () => clearTimeout(t)
-  }, [step])
+  }, [step, skipMarks])
 
   useEffect(() => {
     if (step !== 'marks') return
@@ -223,22 +261,25 @@ function useChromeIntro(play: boolean, onComplete?: () => void) {
     showFill: filled,
     showMarks: marksOn,
     showText: split,
-    settled: step === 'done',
-    tracing: step === 'stroke',
+    settled: step === 'done' || (startedRef.current && filled),
+    tracing: play && step === 'stroke' && !settleInstant,
+    locked: step === 'done',
   }
 }
 
 // ── Blue sticky header ────────────────────────────────────────
 function BlueHeader({
-  label, scrolled, playIntro, onIntroComplete,
+  label, scrolled, playIntro, onIntroComplete, settleInstant = false,
 }: {
   label: string
   scrolled: boolean
   playIntro: boolean
   onIntroComplete?: () => void
+  /** Skip stroke/fill when remounting home after intro already finished. */
+  settleInstant?: boolean
 }) {
-  const { traceGo, onStrokeTransitionEnd, showFill, showMarks, showText, settled, tracing } =
-    useChromeIntro(playIntro, onIntroComplete)
+  const { traceGo, onStrokeTransitionEnd, showFill, showMarks, showText, settled, tracing, locked } =
+    useChromeIntro(playIntro, onIntroComplete, { settleInstant })
 
   const stroke = strokeDrawProps({
     color: '#007AB1',
@@ -247,16 +288,19 @@ function BlueHeader({
     duration: T_TRACE_DUR,
   })
 
+  // Keep fill fully opaque once shown — never fade the header away.
+  const fillOn = showFill || locked || settled
+
   return (
     <div className="relative w-full h-full">
       <svg className="absolute inset-0 size-full"
         viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-        {settled && <WaveBlur clipId="blueH_wblur" path={HEADER} active={scrolled} />}
+        {(settled || locked) && <WaveBlur clipId="blueH_wblur" path={HEADER} active={scrolled} />}
         <path
           d={HEADER}
           fill="url(#blueHGrad)"
           style={{
-            fillOpacity: showFill ? (settled && scrolled ? 0.75 : 1) : 0,
+            fillOpacity: fillOn ? 1 : 0,
             transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
           }}
         />
@@ -268,11 +312,13 @@ function BlueHeader({
           </linearGradient>
         </defs>
       </svg>
-      <span
-        className="absolute z-10 pointer-events-none flex items-center justify-center"
+      {/* Always centered as a group so swastiks + title stay balanced */}
+      <div
+        className="absolute z-10 pointer-events-none flex items-center"
         style={{
-          top: '43.4%', left: 24, right: 24,
-          transform: 'translateY(-50%)',
+          top: '43.4%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
           gap: showText ? 8 : 0,
           transition: `gap ${T_TEXT_DUR}ms ease-in-out`,
         }}
@@ -298,11 +344,9 @@ function BlueHeader({
             lineHeight: 1.2,
             opacity: showText ? 1 : 0,
             maxWidth: showText ? 220 : 0,
-            transform: `translateY(${showText ? 0 : 6}px)`,
             transition: [
               `opacity ${T_TEXT_DUR}ms ease-in-out`,
               `max-width ${T_TEXT_DUR}ms ease-in-out`,
-              `transform ${T_TEXT_DUR}ms ease-in-out`,
             ].join(', '),
           }}
         >
@@ -320,7 +364,7 @@ function BlueHeader({
             transition: `opacity ${T_MARK_DUR}ms ease-in-out`,
           }}
         />
-      </span>
+      </div>
     </div>
   )
 }
@@ -418,7 +462,7 @@ function GreenFooter({
 }) {
   const uid = useId().replace(/:/g, '')
   const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing } =
-    useChromeIntro(playIntro, onIntroComplete)
+    useChromeIntro(playIntro, onIntroComplete, { skipMarks: true })
   const labels = Array.isArray(label) ? label : [label]
   const aria = labels.join(' — ')
 
@@ -476,11 +520,11 @@ function HandcraftedBadge() {
   return (
     <div
       className="relative w-full flex justify-center"
-      style={{ paddingTop: 24, paddingBottom: 25 }}
+      style={{ paddingTop: 24, paddingBottom: 40 }}
       aria-label="Handcrafted and made with love"
     >
       <div
-        className="relative"
+        className="relative mx-auto"
         style={{
           width: 204,
           height: 91,
@@ -513,14 +557,20 @@ function HandcraftedBadge() {
             d="M102.066 90.7594C110.211 75.6331 122.625 78.7644 171.226 84.3472C176.873 84.9958 181.824 80.5803 181.824 74.8964V68.1461C193.399 70.3657 204.132 61.4955 204.132 49.7098V41.0497C204.132 29.264 193.399 20.3938 181.824 22.6134V15.863C181.824 -10.3524 117.801 29.2214 102.066 0C86.403 29.0888 22.3079 -10.3074 22.3079 15.863V22.6134C10.7333 20.3935 0 29.264 0 41.0497V49.7098C0 61.4955 10.7333 70.3657 22.3079 68.1461V74.8964C22.3079 80.5803 27.2595 84.9958 32.9062 84.3472C81.562 78.7584 93.9471 75.6817 102.066 90.7594Z"
           />
         </svg>
+        {/* Optical center of the ornate plate (scallops bias visual mass upward) */}
         <div
-          className="absolute inset-0 flex flex-col items-center justify-center text-center text-white pointer-events-none"
-          style={{ paddingTop: 4, textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
+          className="absolute left-1/2 top-1/2 flex flex-col items-center justify-center text-center text-white pointer-events-none"
+          style={{
+            transform: 'translate(-50%, -46%)',
+            width: '78%',
+            textShadow: '0 1px 2px rgba(0,0,0,0.45)',
+            gap: 1,
+          }}
         >
-          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 16, lineHeight: 'normal' }}>
+          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 16, lineHeight: 1.05 }}>
             Handcrafted
           </span>
-          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 13, lineHeight: 'normal' }}>
+          <span style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: 13, lineHeight: 1.05 }}>
             & made with love
           </span>
         </div>
@@ -649,15 +699,34 @@ function DriveImg({
   const showPhoto = loaded && !failed
 
   return (
-    <>
+    <div
+      className={className}
+      style={{
+        ...style,
+        background: '#E8D4C8',
+      }}
+      aria-busy={!showPhoto}
+    >
+      {/* Always-visible cream base so empty/failed loads never look transparent */}
+      <div
+        aria-hidden
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(145deg, #F3E4DA 0%, #E0C4B4 45%, #D4B09E 100%)',
+          opacity: showPhoto ? 0 : 1,
+          transition: 'opacity 280ms ease-in-out',
+        }}
+      />
       <img
         src={placeholderImg}
         alt=""
         aria-hidden
-        className={className}
+        className="absolute inset-0 size-full object-cover object-center block"
         style={{
-          ...style,
-          opacity: showPhoto ? 0 : 1,
+          maxWidth: 'none',
+          opacity: showPhoto ? 0 : 0.55,
+          mixBlendMode: 'multiply',
           transition: 'opacity 280ms ease-in-out',
         }}
         draggable={false}
@@ -671,9 +740,9 @@ function DriveImg({
           loading={priority ? 'eager' : 'lazy'}
           fetchPriority={priority ? 'high' : 'auto'}
           decoding="async"
-          className={className}
+          className="absolute inset-0 size-full object-cover object-center block"
           style={{
-            ...style,
+            maxWidth: 'none',
             opacity: showPhoto ? 1 : 0,
             transition: 'opacity 280ms ease-in-out',
           }}
@@ -682,43 +751,48 @@ function DriveImg({
           onError={markFail}
         />
       )}
-    </>
+    </div>
   )
 }
 
-// ── Card blur overlay (progressive blur 0 → 4, top → bottom) ──
+// ── Card blur overlay (CSS progressive blur 0 → 4, top → bottom) ──
 function CardBlurOverlay({ uid }: { uid: string }) {
-  const clipId = `cClip_${uid}`, gradId = `cGrad_${uid}`
+  const gradId = `cGrad_${uid}`
   return (
-    <div className="absolute bottom-0 left-0 right-0" style={{ height: '33.2%' }}>
-      <svg className="absolute inset-0 size-full" viewBox="0 0 361 120" preserveAspectRatio="none" fill="none">
-        <foreignObject height="128" width="369" x="-4" y="-4">
-          <div
-            {...{ xmlns: 'http://www.w3.org/1999/xhtml' }}
-            style={{ position: 'relative', height: '100%', width: '100%', clipPath: `url(#${clipId})` }}
-          >
-            {/* Stronger blur at bottom; masks stack to 0→4 */}
-            <div
-              style={{
-                position: 'absolute', inset: 0,
-                backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-                maskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
-              }}
-            />
-            <div
-              style={{
-                position: 'absolute', inset: 0,
-                backdropFilter: 'blur(2px)', WebkitBackdropFilter: 'blur(2px)',
-                maskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
-                WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 55%, #000 100%)',
-              }}
-            />
-          </div>
-        </foreignObject>
-        <path d={CARD_OVERLAY} fill={`url(#${gradId})`} fillOpacity="0.3" />
+    <div
+      className="absolute bottom-0 left-0 right-0 pointer-events-none z-[1]"
+      style={{ height: '42%' }}
+    >
+      {/* Progressive blur: 0 (top) → 4px (bottom) */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backdropFilter: 'blur(4px)',
+          WebkitBackdropFilter: 'blur(4px)',
+          maskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 100%)',
+        }}
+      />
+      <div
+        className="absolute inset-0"
+        style={{
+          backdropFilter: 'blur(2px)',
+          WebkitBackdropFilter: 'blur(2px)',
+          maskImage: 'linear-gradient(to bottom, transparent 0%, #000 50%, #000 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 50%, #000 100%)',
+        }}
+      />
+      {/* Scrim fallback — keeps titles readable if backdrop-filter is skipped */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.22) 45%, transparent 100%)',
+        }}
+      />
+      <svg className="absolute inset-0 size-full" viewBox="0 0 361 120" preserveAspectRatio="none" fill="none" aria-hidden>
+        <path d={CARD_OVERLAY} fill={`url(#${gradId})`} fillOpacity="0.25" />
         <defs>
-          <clipPath id={clipId} transform="translate(4 4)"><path d={CARD_OVERLAY} /></clipPath>
           <linearGradient id={gradId} x1="180.5" y1="120" x2="180.5" y2="0" gradientUnits="userSpaceOnUse">
             <stop /><stop offset="1" stopColor="white" stopOpacity="0" />
           </linearGradient>
@@ -964,22 +1038,27 @@ function CategoryCard({
       }}>
       <div
         className="relative w-full overflow-hidden"
-        style={{
-          aspectRatio: '1 / 1',
-          WebkitMaskImage: CARD_FRAME_MASK,
-          maskImage: CARD_FRAME_MASK,
-          WebkitMaskSize: '100% 100%',
-          maskSize: '100% 100%',
-          WebkitMaskRepeat: 'no-repeat',
-          maskRepeat: 'no-repeat',
-        }}
+        style={{ aspectRatio: '1 / 1' }}
       >
-        <CardImageScroller
-          photos={category.photos}
-          alt={category.galleryTitle}
-          onIndexChange={onSlide}
-          autoplay={armed}
-        />
+        <div
+          className="absolute inset-0"
+          style={{
+            WebkitMaskImage: CARD_FRAME_MASK,
+            maskImage: CARD_FRAME_MASK,
+            WebkitMaskSize: '100% 100%',
+            maskSize: '100% 100%',
+            WebkitMaskRepeat: 'no-repeat',
+            maskRepeat: 'no-repeat',
+          }}
+        >
+          <CardImageScroller
+            photos={category.photos}
+            alt={category.galleryTitle}
+            onIndexChange={onSlide}
+            autoplay={armed}
+          />
+        </div>
+        {/* Blur sits outside the frame mask — ancestor masks kill backdrop-filter */}
         <CardBlurOverlay uid={category.id} />
         <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center justify-end z-10 pb-4 pointer-events-none"
           style={{ paddingLeft: 24, paddingRight: 24, gap: 12 }}>
@@ -987,7 +1066,12 @@ function CategoryCard({
           <div className="flex flex-col items-center w-full">
             {category.lines.map((line, i) => (
               <p key={i} className="text-white text-center leading-tight m-0 w-full"
-                style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_HEAD }}>{line}</p>
+                style={{
+                  fontFamily: FONT_BOLD,
+                  fontWeight: 780,
+                  fontSize: FS_HEAD,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.45)',
+                }}>{line}</p>
             ))}
           </div>
         </div>
@@ -1026,10 +1110,15 @@ function HomeScreen({
   const [headerH, setHeaderH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
-  const [headerPlay, setHeaderPlay] = useState(false)
+  const pastChrome = introPhase === 'cards' || introPhase === 'done'
+  const [headerPlay, setHeaderPlay] = useState(
+    () => introPhase === 'trace' || pastChrome,
+  )
 
   useEffect(() => {
-    if (introPhase === 'trace') setHeaderPlay(true)
+    if (introPhase === 'trace' || introPhase === 'cards' || introPhase === 'done') {
+      setHeaderPlay(true)
+    }
   }, [introPhase])
 
   const onHeaderIntroComplete = useCallback(() => {
@@ -1075,6 +1164,7 @@ function HomeScreen({
           label="Rittisha Creations"
           scrolled={scrolled}
           playIntro={headerPlay}
+          settleInstant={pastChrome}
           onIntroComplete={onHeaderIntroComplete}
         />
       </div>
@@ -1177,6 +1267,7 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
 
 // ── Screen 2 ─────────────────────────────────────────────────
 function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
+  const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
   const [rotateReady, setRotateReady] = useState(false)
@@ -1184,6 +1275,19 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
   const [playFooter, setPlayFooter] = useState(false)
+  const [footerH, setFooterH] = useState(() =>
+    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
+
+  useLayoutEffect(() => {
+    const measure = () => {
+      // Prefer measured footer; fall back to design aspect so padding exists before mount
+      const h = footerRef.current?.offsetHeight
+      setFooterH(h && h > 0 ? h : Math.min(window.innerWidth, 480) / WAVE_AR)
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [playFooter])
 
   // Nav + footer intro after paint; warm gallery images into session cache
   useEffect(() => {
@@ -1253,7 +1357,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
-      <div className="absolute bottom-0 left-0 right-0 z-30">
+      <div ref={footerRef} className="absolute bottom-0 left-0 right-0 z-30">
         {playFooter && (
           <GreenFooter
             key={category.id}
@@ -1291,6 +1395,7 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
       </GalleryNavChrome>
       <div
         className="absolute inset-0 overflow-y-auto"
+        style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >
         <div

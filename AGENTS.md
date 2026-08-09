@@ -1,3 +1,12 @@
+# Agent notes (Figma Make + this product)
+
+This repo is a **Figma Make** Vite app that ships the **Rittisha Creations** site.
+
+**Product docs first:** `README.md` (onboarding + folder map) → `Project.md` (behaviour).  
+**UI entry:** `src/App.tsx` (section map in the file header) → `src/ShlokaIntro.tsx`.
+
+---
+
 # figma-make-app
 
 React + Vite + Tailwind CSS project running inside Figma Make.
@@ -15,11 +24,16 @@ This is the canonical project structure. Start with task-relevant files below. O
 
 - `src/main.tsx` - React entrypoint; imports `src/index.css` and mounts `src/App.tsx` into the `#root` element
 - `src/App.tsx` - Primary application component and the usual starting point for UI work
+- `src/ShlokaIntro.tsx` - Boot shloka animation (home load)
+- `src/data/categories.ts` / `src/data/driveCatalogue.ts` - Catalogue types + Drive fetch
+- `api/catalogue.js` / `api/media.js` - Vercel serverless catalogue + media proxy
 - `src/index.css` - Global CSS entrypoint and Tailwind CSS v4 import
 - `index.html` - Vite HTML shell containing the `#root` element and loading `src/main.tsx`
 - `package.json` - Project dependencies and the Vite build, development, preview, and formatting scripts
 - `vite.config.ts` - Vite configuration with React, Tailwind CSS v4, and Figma Make plugins plus the `@` alias for `src`
 - `.mise.toml` - Toolchain versions for Node.js and pnpm
+
+Ignore `src/imports/` and root `imports/` — unused Figma dumps.
 
 ## Dependencies
 
@@ -39,3 +53,4 @@ This project uses **Tailwind CSS v4** through the `@tailwindcss/vite` plugin con
 - Use double quotes for strings containing apostrophes (`"We're here to help"`), or escape them in single-quoted strings. An unescaped apostrophe in a single-quoted string breaks the build.
 - Ensure JSX tags are closed and braces are balanced.
 - Export components as default exports.
+- Prefer the smallest change that fixes the root cause (see `.cursor/rules/ponytail.mdc`).
