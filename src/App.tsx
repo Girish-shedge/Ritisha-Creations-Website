@@ -101,6 +101,44 @@ function useFontsReady() {
   return ready
 }
 
+/** Visible viewport box — take the smallest reported height so browser chrome cannot hide the gallery footer. */
+function useVisualShell() {
+  const read = () => {
+    const vv = window.visualViewport
+    const heights = [
+      vv?.height,
+      window.innerHeight,
+      document.documentElement?.clientHeight,
+    ].filter((n): n is number => typeof n === 'number' && n > 0)
+    const widths = [
+      vv?.width,
+      window.innerWidth,
+      document.documentElement?.clientWidth,
+    ].filter((n): n is number => typeof n === 'number' && n > 0)
+    return {
+      top: vv?.offsetTop ?? 0,
+      height: Math.min(...heights),
+      width: Math.min(Math.min(...widths), 480),
+    }
+  }
+  const [box, setBox] = useState(() =>
+    typeof window !== 'undefined' ? read() : { top: 0, height: 800, width: 393 },
+  )
+  useEffect(() => {
+    const sync = () => setBox(read())
+    sync()
+    window.addEventListener('resize', sync)
+    window.visualViewport?.addEventListener('resize', sync)
+    window.visualViewport?.addEventListener('scroll', sync)
+    return () => {
+      window.removeEventListener('resize', sync)
+      window.visualViewport?.removeEventListener('resize', sync)
+      window.visualViewport?.removeEventListener('scroll', sync)
+    }
+  }, [])
+  return box
+}
+
 // ── Background ────────────────────────────────────────────────
 function BgImage() {
   return (
@@ -451,7 +489,7 @@ function RotatingLines({
 
 // ── Green sticky footer ───────────────────────────────────────
 function GreenFooter({
-  label, scrolled, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true,
+  label, scrolled, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true, shellWidth,
 }: {
   label: string | string[]
   scrolled: boolean
@@ -461,6 +499,8 @@ function GreenFooter({
   visible?: boolean
   /** When false, show first line only (no rotation). */
   rotateActive?: boolean
+  /** Column width (visual viewport, capped at 480) — keeps wave height correct on phones. */
+  shellWidth?: number
 }) {
   const uid = useId().replace(/:/g, '')
   const { traceGo, onStrokeTransitionEnd, showFill, showText, settled, tracing, locked } =
@@ -468,7 +508,8 @@ function GreenFooter({
   const labels = Array.isArray(label) ? label : [label]
   const aria = labels.join(' — ')
   // Explicit px height — aspect-ratio + % height collapses to 0 on some iOS WebViews
-  const waveH = Math.min(typeof window !== 'undefined' ? window.innerWidth : 393, 480) / WAVE_AR
+  const colW = shellWidth ?? Math.min(typeof window !== 'undefined' ? window.innerWidth : 393, 480)
+  const waveH = Math.max(72, colW / WAVE_AR)
 
   const stroke = strokeDrawProps({
     color: '#4CED77',
@@ -485,6 +526,7 @@ function GreenFooter({
       className="pointer-events-auto block w-full active:opacity-75" aria-label={aria}
       style={{
         visibility: visible ? 'visible' : 'hidden',
+        // Lift wave above home indicator only — no solid green pad under the footer
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         boxSizing: 'content-box',
       }}>
@@ -493,7 +535,8 @@ function GreenFooter({
         style={{ height: waveH, minHeight: 72 }}
       >
         <svg className="absolute inset-0 size-full"
-          viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
+          viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none"
+          style={{ display: 'block' }}>
           {(settled || locked) && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active={scrolled} />}
           <path
             d={FOOTER}
@@ -1296,7 +1339,11 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
 }
 
 // ── Screen 2 ─────────────────────────────────────────────────
-function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: () => void }) {
+function GalleryScreen({ category, onBack, shellWidth }: {
+  category: CategoryData
+  onBack: () => void
+  shellWidth: number
+}) {
   const footerRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [footerReady, setFooterReady] = useState(false)
@@ -1305,18 +1352,22 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
   const [footerH, setFooterH] = useState(() =>
-    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
+    Math.max(72, shellWidth / WAVE_AR))
 
   useLayoutEffect(() => {
     const measure = () => {
-      // Prefer measured footer; fall back to design aspect so padding exists before mount
+      // Prefer measured footer; fall back so scroll padding exists before paint
       const h = footerRef.current?.offsetHeight
-      setFooterH(h && h > 0 ? h : Math.min(window.innerWidth, 480) / WAVE_AR)
+      setFooterH(h && h > 0 ? h : Math.max(72, shellWidth / WAVE_AR))
     }
     measure()
     window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
-  }, [category.id, footerReady])
+    window.visualViewport?.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('resize', measure)
+    }
+  }, [category.id, footerReady, shellWidth])
 
   // Nav intro after paint; warm gallery images into session cache
   useEffect(() => {
@@ -1409,13 +1460,14 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
       </GalleryNavChrome>
       <div
         className="absolute inset-0 z-10 overflow-y-auto"
-        style={{ paddingBottom: footerH }}
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
       >
         <div
           className="flex flex-col"
           style={{
             gap: 16,
+            // Clear sticky footer without extra top/bottom list padding
+            paddingBottom: footerH,
             opacity: showPhotos ? 1 : 0,
             transition: 'opacity 480ms ease-in-out',
           }}
@@ -1430,20 +1482,32 @@ function GalleryScreen({ category, onBack }: { category: CategoryData; onBack: (
           ))}
         </div>
       </div>
-      {/* After scroll in DOM + high z — explicit height (aspect-ratio collapses on iOS) */}
+      {/* Fixed to the visible viewport bottom — survives 100vh / WebView chrome bugs */}
       <div
         ref={footerRef}
-        className="absolute bottom-0 left-0 right-0 z-50"
+        className="pointer-events-none"
+        style={{
+          position: 'fixed',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 50,
+          display: 'flex',
+          justifyContent: 'center',
+        }}
       >
-        <GreenFooter
-          key={category.id}
-          label={['DM us for more information', 'Customization also available']}
-          scrolled={footerReady ? scrolled : false}
-          href={waUrl(waCategoryMsg(category.galleryTitle))}
-          playIntro
-          onIntroComplete={() => setFooterReady(true)}
-          rotateActive={rotateReady}
-        />
+        <div className="pointer-events-auto w-full max-w-[480px]">
+          <GreenFooter
+            key={category.id}
+            label={['DM us for more information', 'Customization also available']}
+            scrolled={footerReady ? scrolled : false}
+            href={waUrl(waCategoryMsg(category.galleryTitle))}
+            playIntro
+            onIntroComplete={() => setFooterReady(true)}
+            rotateActive={rotateReady}
+            shellWidth={shellWidth}
+          />
+        </div>
       </div>
     </div>
   )
@@ -1557,16 +1621,24 @@ export default function App() {
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('loop'),
   )
   const showShloka = loopShloka || (!pathSlug() && !bootDone)
+  const shell = useVisualShell()
 
   return (
     <div
-      className="flex justify-center items-stretch bg-white min-h-[100vh] min-h-[100dvh] min-h-[100svh]"
+      className="flex justify-center items-stretch bg-white"
       style={{
+        minHeight: shell.height,
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
+        // Pin to visual viewport so bottom chrome cannot cover the gallery footer
+        paddingTop: shell.top,
+        boxSizing: 'border-box',
       }}
     >
-      <div className="relative w-full max-w-[480px] h-[100vh] h-[100dvh] h-[100svh]">
+      <div
+        className="relative w-full max-w-[480px]"
+        style={{ height: shell.height }}
+      >
         {contentReady && !loopShloka && (
           <div className="absolute inset-0"
             style={{
@@ -1575,7 +1647,11 @@ export default function App() {
               transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
             }}>
             {selected
-              ? <GalleryScreen category={selected} onBack={() => navigate(null)} />
+              ? <GalleryScreen
+                  category={selected}
+                  onBack={() => navigate(null)}
+                  shellWidth={shell.width}
+                />
               : <HomeScreen
                   categories={categories}
                   onViewAll={(cat) => navigate(cat)}

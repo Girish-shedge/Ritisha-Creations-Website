@@ -51,11 +51,12 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
 - Circular back / share; truncated white title
 - Share copy + category URL; Image 1 prefetched
-- Edge-to-edge **1:1** photos, **16px** gap; `paddingBottom` = measured footer height (includes safe-area)
-- **Green footer must always be present** on every catalog detail open — **explicit px height** (`min(vw,480)/WAVE_AR`, `minHeight: 72`); do not rely on `aspect-ratio` + `%` height (collapses on some iOS WebViews)
-- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
+- Edge-to-edge **1:1** photos, **16px** gap; no top/bottom list padding (only `paddingBottom` = measured wave footer so the last photo clears the sticky CTA)
+- **Green footer must always be present** on every catalog detail open — **explicit px height** (`max(72, colW/WAVE_AR)`); do not rely on `aspect-ratio` + `%` height (collapses on some iOS WebViews)
+- App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
+- Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader); CSS gradient fallback behind SVG
 - After intro + **0.5s**, rotates **DM us for more information** ↔ **Customization also available**
-- Footer stacks **above** the photo scroller (`z-50`, after scroll in DOM); `paddingBottom: env(safe-area-inset-bottom)` on the footer shell
+- Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)` — no solid green pad under the CTA
 
 Navigation: History API + **280ms** fade. Back → `/`.
 
@@ -69,7 +70,7 @@ Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow)
 - Shell height from `visualViewport`; ornaments use **px `translate3d`**, not `%` slides.
 - Bottom border sits at `bottom: env(safe-area-inset-bottom)` (not under the home indicator).
 - Bottom ornament = vertical mirror of top: wrapper `scaleY(-1)` + same `rotate(180deg)` on `<img>` as top (scaleY alone shows the thin baseline; scaleY on `<img>` can paint blank on iOS).
-- Letters: per-glyph CSS `drop-shadow` + mid-reveal glow (`LETTER_SHADOW` + glow envelope); **also** apply the same filter on the line **host** so iOS still shows shadow/glow when path filters are ignored. Do not replace with a single heavy filter on the whole text block.
+- Letters: **per-glyph only** glow while that letter is mid-appear (0→1→0), then fade; settled glyphs keep CSS `drop-shadow` (`LETTER_SHADOW`). Host filter is **shadow only** — never put glow on the line host (it lights the whole word/sentence).
 - Plaque stage: 393×800 scaled with `min(vw, vh)`.
 - Skipped on `/{slug}` deep links. `?loop=1` replays forever (review).
 - `onDone` starts home header; `onGone` unmounts overlay.
@@ -84,7 +85,8 @@ Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill 
 
 ## Mobile / browser notes (do not regress)
 
-- `viewport-fit=cover` in `index.html`; safe-area insets on shell + gallery footer.
+- App shell uses `visualViewport` height/offset (see `useVisualShell` in `App.tsx`).
+- `viewport-fit=cover` in `index.html`; safe-area inset under gallery wave footer only (no green rectangle pad).
 - Test **iOS Chrome + Safari** and Android: green footer CTA text, shloka **both** borders, letter shadow/glow, card blur following cuts.
 - After every `vercel deploy --prod`, alias **`rittishacreations.vercel.app`** (two t’s). Vercel often aliases the old one-t host (`ritishacreations.vercel.app`) instead.
 

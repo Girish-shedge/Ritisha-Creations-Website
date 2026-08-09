@@ -32,8 +32,8 @@ const LOOP_GAP_MS = 400
 const OM_SPIN_S = 40
 const OM_OPACITY = 0.32
 
-/** Steady letter drop-shadow (glow layered on top while appearing). */
-const LETTER_SHADOW = 'drop-shadow(0px 2px 3px rgba(48, 30, 21, 0.65))'
+/** Steady letter drop-shadow (visible on appeared glyphs; glow is per-glyph only). */
+const LETTER_SHADOW = 'drop-shadow(0px 2px 3.5px rgba(48, 30, 21, 0.7))'
 
 const DESIGN_W = 393
 const DESIGN_H = 800
@@ -102,17 +102,17 @@ function paintLine(glyphs: Glyph[], localT: number) {
   const t = easeInOut(Math.max(0, Math.min(1, localT)))
   const total = glyphs.reduce((s, g) => s + g.weight, 0) || 1
   let cursor = 0
-  let maxGlow = 0
   for (const g of glyphs) {
     const start = cursor / total
     const end = (cursor + g.weight) / total
     cursor += g.weight
+    // Per-glyph progress only — glow must not leak to the rest of the line
     const local = Math.max(0, Math.min(1, (t - start) / (end - start || 1)))
     const appear = easeInOut(local)
     g.el.style.opacity = String(appear)
 
-    const glow = glowEnvelope(local) * appear
-    maxGlow = Math.max(maxGlow, glow)
+    // Glow only while this glyph is mid-appear (0→1→0); settled glyphs keep drop-shadow only
+    const glow = local > 0 && local < 1 ? glowEnvelope(local) * appear : 0
     if (glow > 0.02) {
       const blur = 3 + glow * 8
       const soft = 8 + glow * 14
@@ -122,24 +122,14 @@ function paintLine(glyphs: Glyph[], localT: number) {
         LETTER_SHADOW,
       ].join(' ')
     } else {
-      g.el.style.filter = LETTER_SHADOW
+      // Appeared (or not yet): steady drop-shadow only — never a line-wide glow
+      g.el.style.filter = appear > 0.02 ? LETTER_SHADOW : 'none'
     }
   }
 
+  // Host keeps shadow only (iOS path-filter fallback). Do NOT put glow here — it lights the whole line.
   const host = glyphs[0]?.el.closest('div')
-  if (host instanceof HTMLElement) {
-    if (maxGlow > 0.02) {
-      const blur = 3 + maxGlow * 8
-      const soft = 8 + maxGlow * 14
-      host.style.filter = [
-        `drop-shadow(0 0 ${blur}px rgba(255, 236, 210, ${0.98 * maxGlow}))`,
-        `drop-shadow(0 0 ${soft}px rgba(223, 203, 193, ${0.7 * maxGlow}))`,
-        LETTER_SHADOW,
-      ].join(' ')
-    } else {
-      host.style.filter = LETTER_SHADOW
-    }
-  }
+  if (host instanceof HTMLElement) host.style.filter = LETTER_SHADOW
 }
 
 function clearLines(refs: React.MutableRefObject<Glyph[]>[]) {
