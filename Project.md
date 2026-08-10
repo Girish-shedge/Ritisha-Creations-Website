@@ -24,8 +24,10 @@ Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer 
 | Drive | App |
 |-------|-----|
 | Subfolder name | Category title + slug (`/modak-pushp-backdrop`) |
-| Files `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = share / OG cover |
+| Files `Image 1`, `Image 2`, … | Sorted by number; `Image 1` = gallery cover |
 | Empty / non-image folders | Skipped |
+
+**Site brand icons (not Drive):** श्री master at `scripts/assets/brand-icon-source.png` → `pnpm icons` writes `public/favicon.ico`, `public/icons/*`, Apple touch, PWA 192/512, and `og-image.png` (1200) for tabs, home screens, and share / link previews.
 
 - Listed on **every page load** via `GET /api/catalogue` (server sets Referer for Drive).
 - Home thumbs **w640**; gallery **w1200**; श्री watermark placeholder until decode; session `imgReady` cache.

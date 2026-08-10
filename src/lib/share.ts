@@ -17,15 +17,20 @@ const settled = new Map<string, File | null>()
 let brandShareFile: Promise<File | null> | null = null
 
 async function fetchBrandShareFile(): Promise<File | null> {
-  try {
-    const res = await fetch('/favicon.png')
-    if (!res.ok) return null
-    const blob = await res.blob()
-    if (!blob.size) return null
-    return new File([blob], BRAND_SHARE_NAME, { type: blob.type || 'image/png' })
-  } catch {
-    return null
+  // Prefer high-res share/OG art; fall back to PWA 512 then apple-touch
+  const urls = ['/icons/og-image.png', '/icons/icon-512.png', '/apple-touch-icon.png']
+  for (const url of urls) {
+    try {
+      const res = await fetch(url)
+      if (!res.ok) continue
+      const blob = await res.blob()
+      if (!blob.size) continue
+      return new File([blob], BRAND_SHARE_NAME, { type: blob.type || 'image/png' })
+    } catch {
+      // try next
+    }
   }
+  return null
 }
 
 function getBrandShareFile() {

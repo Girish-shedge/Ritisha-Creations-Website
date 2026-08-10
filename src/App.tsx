@@ -1430,7 +1430,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
 
   useEffect(() => {
     document.title = `${category.galleryTitle} · Rittisha Creations`
-    const brandImage = `${window.location.origin}/favicon.png`
+    const brandImage = `${window.location.origin}/icons/og-image.png`
     const setMeta = (prop: string, content: string) => {
       let el = document.querySelector(`meta[property="${prop}"]`) as HTMLMetaElement | null
       if (!el) {

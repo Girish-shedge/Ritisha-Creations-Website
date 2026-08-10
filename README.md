@@ -88,16 +88,44 @@ src/
   data/
     categories.ts       Types + localStorage catalogue cache
     driveCatalogue.ts   Fetch/normalize Drive → CategoryData[]
-  lib/share.ts          Web Share + Image 1 prefetch
+  lib/share.ts          Web Share (brand og-image first) + Image 1 prefetch
   assets/               bg, placeholder, intro art, icons
 api/
   catalogue.js          Vercel serverless — lists Drive (Referer-safe)
   media.js              Image proxy fallback for share / stubborn files
-public/fonts/           Season Mix Bold + SemiBold
+public/
+  favicon.ico           Multi-size 16/32/48 (Windows + legacy)
+  favicon.png           32×32 convenience
+  apple-touch-icon.png  180×180 (iPhone home screen)
+  site.webmanifest      PWA icons 192 + 512
+  icons/                Sized PNG set (see Brand icons below)
+  fonts/                Season Mix Bold + SemiBold
+scripts/
+  generate-icons.mjs    Resize brand source → public icon set (`pnpm icons`)
+  assets/brand-icon-source.png  Master श्री artwork
 Project.md              Behaviour / design contract (+ mobile do-not-regress)
 AGENTS.md               Figma Make / Vite agent notes
 .cursor/rules/ponytail.mdc   Prefer smallest correct change
 ```
+
+### Brand icons (favicon / PWA / share)
+
+Source: `scripts/assets/brand-icon-source.png`. Regenerate with `pnpm icons`.
+
+| File | Size | Platforms |
+|------|------|-----------|
+| `favicon.ico` | 16 + 32 + 48 | Windows browsers, legacy desktop |
+| `icons/favicon-16x16.png` | 16 | Mac / Chrome / Firefox tabs |
+| `icons/favicon-32x32.png` | 32 | Mac / Chrome / Firefox tabs |
+| `icons/favicon-48x48.png` | 48 | Desktop + Android browser |
+| `icons/apple-touch-icon-152x152.png` | 152 | iPad home screen |
+| `icons/apple-touch-icon-167x167.png` | 167 | iPad Pro home screen |
+| `apple-touch-icon.png` / `icons/…180` | 180 | iPhone home screen / iOS share hint |
+| `icons/icon-192.png` | 192 | Android PWA / Add to Home Screen |
+| `icons/icon-512.png` | 512 | Android PWA + native share sheet |
+| `icons/og-image.png` | 1200 | Open Graph / Twitter / link previews |
+
+Wired in `index.html` + `public/site.webmanifest`. Share sheet prefers `og-image.png`.
 
 ### `App.tsx` sections (search for `──`)
 
@@ -116,7 +144,8 @@ AGENTS.md               Figma Make / Vite agent notes
 ## Content rules (Drive)
 
 - Each **subfolder name** → category title + URL slug  
-- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = gallery cover; site **favicon / OG / share-sheet** art is `/public/favicon.png` (श्री)  
+- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = gallery cover  
+- Site brand art (श्री): multi-size set under `public/icons/` + `favicon.ico` (regenerate with `pnpm icons`)  
 - Empty or non-image folders are skipped  
 - On API failure → last good `localStorage` cache (`ritisha.driveCatalogue.v4`)
 
@@ -129,6 +158,7 @@ Details: `Project.md`.
 | Command | Does |
 |---------|------|
 | `pnpm dev` | Vite dev server |
+| `pnpm icons` | Resize brand source → favicon / PWA / Apple / OG set |
 | `pnpm build` | `security:check` then Vite build |
 | `pnpm security:check` | Block accidental secrets in tracked sources |
 | `pnpm sync:images` | Optional legacy Drive→disk sync (not used by the live CDN path) |

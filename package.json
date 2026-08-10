@@ -7,6 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "sync:images": "node scripts/sync-drive-images.mjs",
     "security:check": "node scripts/security-check.mjs",
+    "icons": "node scripts/generate-icons.mjs",
     "build": "node scripts/security-check.mjs && vite build",
     "preview": "vite preview",
     "format": "oxfmt"
