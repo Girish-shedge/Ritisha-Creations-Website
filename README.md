@@ -125,7 +125,12 @@ Source: `scripts/assets/brand-icon-source.png`. Regenerate with `pnpm icons`.
 | `icons/icon-512.png` | 512 | Android PWA + native share sheet |
 | `icons/og-image.png` | 1200 | Open Graph / Twitter / link previews |
 
-Wired in `index.html` + `public/site.webmanifest`. Share sheet prefers `og-image.png`.
+Wired in `index.html` + `public/site.webmanifest`.  
+**Share / OG:** `og-image.png` is the default Open Graph + Twitter image and the **first** file in the native share sheet (`src/lib/share.ts`). Gallery deep links still set `og:title` / `og:url` to the category, but `og:image` stays the brand mark.
+
+### Figma ↔ code names
+
+Code-built frames on Page 3 of **Extension - V2** use the same names as React (`HomeScreen`, `GalleryScreen`, `ShlokaIntro`, `BlueHeader`, `GreenFooter`, `CategoryCard`, `HandcraftedBadge`, …). Prefer those over generic `Frame 1580…` / `Screen N` when editing parity.
 
 ### `App.tsx` sections (search for `──`)
 
@@ -143,11 +148,12 @@ Wired in `index.html` + `public/site.webmanifest`. Share sheet prefers `og-image
 
 ## Content rules (Drive)
 
-- Each **subfolder name** → category title + URL slug  
-- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = gallery cover  
-- Site brand art (श्री): multi-size set under `public/icons/` + `favicon.ico` (regenerate with `pnpm icons`)  
+- Each **subfolder name** → `galleryTitle` + URL slug  
+- Card `lines`: keep the product name intact; trailing `[size]` is its **own** line (`Circular Floral Backdrop` / `[3ft]`) — see `titleLines` in `api/catalogue.js` + `driveCatalogue.ts`  
+- Files named `Image 1`, `Image 2`, … → sort by number; **Image 1** = gallery cover (not the site share/OG art)  
+- Site brand art (श्री): multi-size set under `public/icons/` + `favicon.ico` (regenerate with `pnpm icons`). Link previews and Web Share use **`icons/og-image.png` first**  
 - Empty or non-image folders are skipped  
-- On API failure → last good `localStorage` cache (`ritisha.driveCatalogue.v4`)
+- On API failure → last good `localStorage` cache (`ritisha.driveCatalogue.v5`)
 
 Details: `Project.md`.
 

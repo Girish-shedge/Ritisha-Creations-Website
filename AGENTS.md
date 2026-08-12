@@ -9,6 +9,10 @@ This repo is a **Figma Make** Vite app that ships the **Rittisha Creations** sit
 
 **Do not regress (see `Project.md`):** gallery green footer always visible with intro + rotating DM/Customization copy; card blur clipped to corner cuts; shloka both borders + per-letter glow/shadow (host filter for iOS).
 
+**Brand / share:** favicon + OG from `scripts/assets/brand-icon-source.png` (`pnpm icons`). Share sheet and `og:image` use brand `icons/og-image.png`, not Drive Image 1. Card titles: `titleLines` keeps product name + puts trailing `[size]` on its own line. Catalogue cache key `ritisha.driveCatalogue.v5`.
+
+**Figma:** code-parity frames on Page 3 use React names (`HomeScreen`, `GalleryScreen`, `ShlokaIntro`, …) — see `Project.md` § Figma layer names.
+
 ---
 
 # figma-make-app

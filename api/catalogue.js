@@ -18,7 +18,7 @@ function referer() {
   return (
     process.env.GOOGLE_API_REFERER ||
     process.env.VITE_GOOGLE_API_REFERER ||
-    'https://ritishacreations.vercel.app/'
+    'https://rittishacreations.vercel.app/'
   )
 }
 
@@ -36,11 +36,22 @@ function imageIndex(name) {
   return m ? Number(m[1]) : Number.POSITIVE_INFINITY
 }
 
+/** Card lines: keep product name intact; put trailing `[size]` on its own line. */
 function titleLines(name) {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length <= 3) return [name.trim()]
-  const mid = Math.ceil(parts.length / 2)
-  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')]
+  const trimmed = name.trim()
+  const sizeMatch = trimmed.match(/^(.*?)\s*(\[[^\]]+\])\s*$/)
+  const base = (sizeMatch ? sizeMatch[1] : trimmed).trim()
+  const size = sizeMatch ? sizeMatch[2] : null
+
+  const parts = base.split(/\s+/).filter(Boolean)
+  let lines
+  if (parts.length <= 3) lines = [base]
+  else {
+    const mid = Math.ceil(parts.length / 2)
+    lines = [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')]
+  }
+  if (size) lines.push(size)
+  return lines
 }
 
 function driveThumbUrl(fileId, width) {

@@ -12,6 +12,8 @@
  *   Design tokens / SVG paths     Header, footer, card frame geometry
  *   useChromeIntro                Shared stroke → fill → (marks) → text
  *   BlueHeader / GreenFooter      Sticky chrome (footer = WAVE_AR shell + h-full, always on gallery)
+ *   HomeContactBar                Home-only Call + WhatsApp pills (Figma 7:82)
+ *   HomePromoCarousel             Home promo strip (Figma 14:141 / 14:139 / 14:143)
  *   RotatingLines                 CTA / footer copy rotator
  *   DriveImg / Card*              Photos, frame-masked blur, scroller, category card
  *   HomeScreen / GalleryScreen    Screens
@@ -33,6 +35,9 @@ import bgImg from '@/assets/bg.png'
 import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
+import promo01 from '@/assets/promo/promo-01.png'
+import promo02 from '@/assets/promo/promo-02.png'
+import promo03 from '@/assets/promo/promo-03.png'
 import iconSwastik from '@/assets/icons/swastik.svg'
 
 const SLIDE_MS = 3500
@@ -62,6 +67,15 @@ const CARD_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 361 361"><path fill="white" d="${CARD_FRAME}"/></svg>`,
 )}")`
 
+/** Figma promo Subtract 12:114 — landscape 361×203.172 with corner cuts. */
+const PROMO_W = 361
+const PROMO_H = 203.172
+const PROMO_FRAME =
+  'M341 0C341 10.873 349.676 19.7192 360.483 19.9932L361 20V183.172C349.954 183.172 341 192.126 341 203.172H20C20 192.126 11.0457 183.172 0 183.172V20C10.873 20 19.7192 11.3235 19.9932 0.516602L20 0H341Z'
+const PROMO_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROMO_W} ${PROMO_H}"><path fill="white" d="${PROMO_FRAME}"/></svg>`,
+)}")`
+
 // Half-path strokes: centre peak → outer corner (draw outward L+R simultaneously).
 const HEADER_LEFT =
   'M196.5 87.3859 C166.207 31.1282 42.9478 107.317 42.9478 56.846 V43.8501 C20.6641 48.1238 0 31.0462 0 8.35612 V0'
@@ -75,6 +89,10 @@ const FOOTER_RIGHT =
 const WAVE_AR = 393 / 87.3859
 
 const WA_NUMBER = '918766630191'
+const CALL_NUMBER = '9272517248'
+const HOME_WA_MSG = 'Hey, I am interested in the designs'
+/** Figma Bottom Bar: py-24 + pill; stacked (&lt;300px) needs two pills + 24 gap */
+const HOME_CONTACT_BAR_H = 168
 function waUrl(message: string) {
   return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`
 }
@@ -96,29 +114,13 @@ const T_HEADER_INTRO = T_TRACE_DUR + T_FILL_DUR + T_MARK_DUR + T_TEXT_DUR
 /** Slide home cards in when header chrome is ~60% through. */
 const T_CARDS_AT = Math.round(T_HEADER_INTRO * 0.6)
 const T_CARDS_GAP = 900   // after cards start, then enable scroll
-const SCROLL_RESTORE_MS = 900
 
-function easeInOut(t: number) {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-}
-
-/** Animate scrollTop with ease-in-out (returns cancel). */
-function animateScrollTop(el: HTMLElement, to: number, ms: number) {
-  const from = el.scrollTop
-  if (Math.abs(to - from) < 1) {
-    el.scrollTop = to
-    return () => {}
-  }
-  const t0 = performance.now()
-  let raf = 0
-  const tick = (now: number) => {
-    const u = easeInOut(Math.min(1, (now - t0) / ms))
-    el.scrollTop = from + (to - from) * u
-    if (u < 1) raf = requestAnimationFrame(tick)
-  }
-  raf = requestAnimationFrame(tick)
-  return () => cancelAnimationFrame(raf)
-}
+/** Home promo strip — Figma 14:141 / 14:139 / 14:143 (361×203.172 Subtract). */
+const PROMO_IMGS = [promo01, promo02, promo03]
+const PROMO_GAP = 12
+const PROMO_WIDTH_FRAC = 0.75
+const PROMO_MS = 2000
+const PROMO_AR = PROMO_W / PROMO_H
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -611,7 +613,7 @@ function HandcraftedBadge() {
   return (
     <div
       className="relative w-full flex justify-center"
-      style={{ paddingTop: 24, paddingBottom: 'calc(40px + env(safe-area-inset-bottom, 0px))' }}
+      style={{ paddingTop: 24, paddingBottom: 16 }}
       aria-label="Handcrafted and made with love"
     >
       <div
@@ -1163,28 +1165,286 @@ function CategoryCard({
           style={{ paddingLeft: 24, paddingRight: 24, gap: 12 }}>
           <CardDots count={category.photos.length} active={slide} />
           <div className="flex flex-col items-center w-full">
-            {category.lines.map((line, i) => (
-              <p key={i} className="text-white text-center leading-tight m-0 w-full"
-                style={{
-                  fontFamily: FONT_BOLD,
-                  fontWeight: 780,
-                  fontSize: FS_HEAD,
-                  textShadow: '0 1px 3px rgba(0,0,0,0.45)',
-                }}>{line}</p>
-            ))}
+            <p
+              className="text-white text-center leading-tight m-0 w-full"
+              style={{
+                fontFamily: FONT_BOLD,
+                fontWeight: 780,
+                fontSize: FS_HEAD,
+                textShadow: '0 1px 3px rgba(0,0,0,0.45)',
+                display: '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: 2,
+                overflow: 'hidden',
+              }}
+            >
+              {category.galleryTitle}
+            </p>
           </div>
         </div>
       </div>
       <ViewAllButton
         onClick={onViewAll}
-        ariaLabel="View all photos — Prices starting from ₹499"
+        ariaLabel="Open in gallery — Prices starting from ₹499"
       >
         <RotatingLines
-          lines={['View all photos', 'Prices starting from ₹499']}
+          lines={['Open in gallery', 'Prices starting from ₹499']}
           active={armed}
           style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}
         />
       </ViewAllButton>
+    </div>
+  )
+}
+
+/** Home-only Call + WhatsApp bar — Figma 7:82. Collapses to 48×48 icons while scrolling. */
+function HomeContactBar({ compact }: { compact: boolean }) {
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef(0)
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), 1800)
+  }
+
+  const onCall = async () => {
+    try {
+      await navigator.clipboard?.writeText(CALL_NUMBER)
+    } catch {
+      // clipboard may be denied; still open dialer
+    }
+    showToast('Number copied')
+    // Brief beat so the toast paints before the dialer steals focus
+    window.setTimeout(() => {
+      window.location.href = `tel:+91${CALL_NUMBER}`
+    }, 180)
+  }
+
+  const ease = '320ms ease-in-out'
+  const pillStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    height: 48,
+    width: compact ? 48 : undefined,
+    flex: compact ? '0 0 48px' : '1 1 0%',
+    gap: compact ? 0 : 4,
+    padding: compact ? 0 : '0 16px',
+    borderRadius: 40,
+    transition: `flex ${ease}, width ${ease}, padding ${ease}, gap ${ease}`,
+  }
+  const labelStyle: React.CSSProperties = {
+    fontFamily: FONT_BOLD,
+    fontSize: 16,
+    letterSpacing: -0.16,
+    color: '#fff',
+    lineHeight: 'normal',
+    whiteSpace: 'nowrap',
+    maxWidth: compact ? 0 : 160,
+    opacity: compact ? 0 : 1,
+    overflow: 'hidden',
+    transition: `max-width ${ease}, opacity ${ease}`,
+  }
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      <div
+        className={
+          compact
+            ? 'pointer-events-auto relative flex w-full flex-row items-center justify-between px-4 py-6'
+            : 'pointer-events-auto relative flex w-full flex-col gap-6 px-4 py-6 min-[300px]:flex-row min-[300px]:items-start'
+        }
+        data-name="Bottom Bar"
+        style={{ transition: `gap ${ease}` }}
+      >
+        {toast && (
+          <div
+            className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-full px-3 py-1.5 text-[13px] text-white"
+            style={{
+              bottom: 'calc(100% - 8px)',
+              background: 'rgba(0,0,0,0.78)',
+              fontFamily: FONT_SEMI,
+            }}
+            role="status"
+          >
+            {toast}
+          </div>
+        )}
+        <button type="button" style={pillStyle} onClick={onCall} aria-label={`Call ${CALL_NUMBER}`}>
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ background: 'linear-gradient(to bottom, #0e62ec, #0b4ebc)' }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ boxShadow: 'inset 0px -2px 8px 0px #3a80f3' }}
+          />
+          <span
+            className="relative shrink-0 overflow-hidden"
+            style={{
+              width: compact ? 48 : 24,
+              height: compact ? 48 : 24,
+              padding: compact ? 12 : 0,
+              boxSizing: 'border-box',
+              transition: `width ${ease}, height ${ease}, padding ${ease}`,
+            }}
+          >
+            <img src="/icons/icon-phone.svg" alt="" className="block size-full" width={24} height={24} />
+          </span>
+          <span className="relative" style={labelStyle} aria-hidden={compact}>
+            {CALL_NUMBER}
+          </span>
+        </button>
+        <a
+          style={pillStyle}
+          href={waUrl(HOME_WA_MSG)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`WhatsApp ${WA_NUMBER.slice(2)}`}
+        >
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ background: 'linear-gradient(to bottom, #25d366, #1ea952)' }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ boxShadow: 'inset 0px -2px 8px 0px rgba(77,224,132,0.5)' }}
+          />
+          <span
+            className="relative shrink-0 overflow-hidden"
+            style={{
+              width: compact ? 48 : 24,
+              height: compact ? 48 : 24,
+              padding: compact ? 12 : 0,
+              boxSizing: 'border-box',
+              transition: `width ${ease}, height ${ease}, padding ${ease}`,
+            }}
+          >
+            <img src="/icons/icon-whatsapp.svg" alt="" className="block size-full" width={24} height={24} />
+          </span>
+          <span className="relative" style={labelStyle} aria-hidden={compact}>
+            {WA_NUMBER.slice(2)}
+          </span>
+        </a>
+      </div>
+    </div>
+  )
+}
+
+/** Non-interactive home promo — Figma Subtract shape; 75% width; 12px gap; infinite forward. */
+function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number }) {
+  const n = PROMO_IMGS.length
+  const track = useMemo(() => [...PROMO_IMGS, ...PROMO_IMGS, ...PROMO_IMGS], [])
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Start in the middle copy so left + right neighbors always exist
+  const [i, setI] = useState(n)
+  const [anim, setAnim] = useState(true)
+  const [boxW, setBoxW] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const measure = () => setBoxW(el.clientWidth)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!visible) return
+    const t = window.setInterval(() => {
+      setAnim(true)
+      setI((v) => v + 1)
+    }, PROMO_MS)
+    return () => window.clearInterval(t)
+  }, [visible])
+
+  const onTrackEnd = () => {
+    // After sliding into the third copy, snap back one set — same visual, no reverse
+    if (i < n * 2) return
+    setAnim(false)
+    setI((v) => v - n)
+  }
+
+  // Hard size from Figma aspect; width is always 75% of the home column
+  const slideW = boxW > 0 ? boxW * PROMO_WIDTH_FRAC : 0
+  const slideH = slideW > 0 ? slideW * (PROMO_H / PROMO_W) : 0
+  const step = slideW + PROMO_GAP
+  const tx = slideW > 0 ? (boxW - slideW) / 2 - i * step : 0
+
+  return (
+    <div
+      ref={rootRef}
+      className="relative w-full overflow-hidden pointer-events-none"
+      aria-hidden
+      style={{
+        height: slideH || undefined,
+        aspectRatio: slideH ? undefined : `${PROMO_AR}`,
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(52px)',
+        transition: `opacity 650ms ease-in-out ${delay}ms, transform 650ms ease-in-out ${delay}ms`,
+      }}
+    >
+      <div
+        className="absolute inset-y-0 left-0 flex items-center"
+        onTransitionEnd={(e) => {
+          if (e.target !== e.currentTarget) return
+          if (e.propertyName !== 'transform') return
+          onTrackEnd()
+        }}
+        style={{
+          gap: PROMO_GAP,
+          transform: `translateX(${tx}px)`,
+          transition: anim && slideW > 0 ? 'transform 480ms ease-in-out' : 'none',
+          willChange: 'transform',
+        }}
+      >
+        {track.map((src, idx) => {
+          const active = idx === i
+          return (
+            <div
+              key={idx}
+              className="relative shrink-0 overflow-hidden"
+              style={{
+                width: slideW || '75%',
+                height: slideH || '100%',
+                WebkitMaskImage: PROMO_FRAME_MASK,
+                maskImage: PROMO_FRAME_MASK,
+                WebkitMaskSize: '100% 100%',
+                maskSize: '100% 100%',
+                WebkitMaskRepeat: 'no-repeat',
+                maskRepeat: 'no-repeat',
+                transform: `scale(${active ? 1 : 0.9})`,
+                opacity: active ? 1 : 0.75,
+                transition: anim
+                  ? 'transform 480ms ease-in-out, opacity 480ms ease-in-out'
+                  : 'none',
+              }}
+            >
+              <img
+                src={src}
+                alt=""
+                draggable={false}
+                className="absolute inset-0 size-full object-cover object-center block"
+                style={{ maxWidth: 'none' }}
+              />
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1205,7 +1465,9 @@ function HomeScreen({
   const headerRef = useRef<HTMLDivElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const restoredRef = useRef(false)
+  const scrollIdleTimer = useRef(0)
   const [scrolled, setScrolled] = useState(false)
+  const [barCompact, setBarCompact] = useState(false)
   const [headerH, setHeaderH] = useState(() =>
     typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
@@ -1247,24 +1509,18 @@ function HomeScreen({
     return () => window.removeEventListener('resize', measure)
   }, [])
 
-  // Smooth ease-in-out scroll restore when returning from gallery
-  useEffect(() => {
+  useEffect(() => () => window.clearTimeout(scrollIdleTimer.current), [])
+
+  // Instant scroll restore when returning from gallery (no ease animation)
+  useLayoutEffect(() => {
     if (restoredRef.current) return
     if (restoreScrollTop == null || restoreScrollTop <= 0) return
     if (introPhase !== 'done') return
     const el = scrollerRef.current
     if (!el) return
     restoredRef.current = true
-    el.scrollTop = 0
-    setScrolled(false)
-    const cancel = animateScrollTop(el, restoreScrollTop, SCROLL_RESTORE_MS)
-    const end = window.setTimeout(() => {
-      setScrolled(restoreScrollTop > 8)
-    }, SCROLL_RESTORE_MS)
-    return () => {
-      cancel()
-      clearTimeout(end)
-    }
+    el.scrollTop = restoreScrollTop
+    setScrolled(restoreScrollTop > 8)
   }, [restoreScrollTop, introPhase])
 
   const cardsVisible = introPhase === 'cards' || introPhase === 'done'
@@ -1289,6 +1545,7 @@ function HomeScreen({
         className="absolute inset-0 overflow-y-auto scroll-smooth"
         style={{
           paddingTop: headerH + 16,
+          paddingBottom: `calc(${HOME_CONTACT_BAR_H}px + env(safe-area-inset-bottom, 0px))`,
           overflowY: scrollable ? 'auto' : 'hidden',
         }}
         onScroll={(e) => {
@@ -1296,16 +1553,20 @@ function HomeScreen({
           const y = e.currentTarget.scrollTop
           setScrolled(y > 8)
           onScrollTopChange?.(y)
+          setBarCompact(true)
+          window.clearTimeout(scrollIdleTimer.current)
+          scrollIdleTimer.current = window.setTimeout(() => setBarCompact(false), 180)
         }}
       >
         <div className="flex flex-col gap-10 items-center px-4 pt-4">
+          <HomePromoCarousel visible={cardsVisible} delay={0} />
           {categories.map((cat, i) => (
             <CategoryCard
               key={cat.id}
               category={cat}
               onViewAll={() => onViewAll(cat)}
               introVisible={cardsVisible}
-              introDelay={i * 180}
+              introDelay={(i + 1) * 180}
               scrollerRef={scrollerRef}
               scrollActive={scrollable}
             />
@@ -1313,6 +1574,8 @@ function HomeScreen({
           <HandcraftedBadge />
         </div>
       </div>
+
+      <HomeContactBar compact={barCompact} />
     </div>
   )
 }

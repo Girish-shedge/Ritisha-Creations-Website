@@ -25,11 +25,22 @@ export function imageIndex(name: string): number {
   return m ? Number(m[1]) : Number.POSITIVE_INFINITY
 }
 
+/** Card lines: keep product name intact; put trailing `[size]` on its own line. */
 export function titleLines(name: string): string[] {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length <= 3) return [name.trim()]
-  const mid = Math.ceil(parts.length / 2)
-  return [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')]
+  const trimmed = name.trim()
+  const sizeMatch = trimmed.match(/^(.*?)\s*(\[[^\]]+\])\s*$/)
+  const base = (sizeMatch ? sizeMatch[1] : trimmed).trim()
+  const size = sizeMatch ? sizeMatch[2] : null
+
+  const parts = base.split(/\s+/).filter(Boolean)
+  let lines: string[]
+  if (parts.length <= 3) lines = [base]
+  else {
+    const mid = Math.ceil(parts.length / 2)
+    lines = [parts.slice(0, mid).join(' '), parts.slice(mid).join(' ')]
+  }
+  if (size) lines.push(size)
+  return lines
 }
 
 export async function fetchDriveCatalogue(): Promise<CategoryData[]> {
@@ -62,6 +73,15 @@ if (import.meta.env.DEV) {
   console.assert(imageIndex('Image 10') === 10, 'Image 10 index')
   console.assert(imageIndex('Image 2') < imageIndex('Image 10'), 'natural order')
   console.assert(slugify('Modak Pushp Backdrop') === 'modak-pushp-backdrop', 'slug')
-  const lines = titleLines('Circular Round Backdrop Extra')
-  console.assert(lines.length === 2, 'titleLines should split long names', lines)
+  console.assert(
+    titleLines('Circular Floral Backdrop [3ft]').join('|') ===
+      'Circular Floral Backdrop|[3ft]',
+    'size suffix on own line',
+  )
+  console.assert(
+    titleLines('Hanging Toran [5ft]').join('|') === 'Hanging Toran|[5ft]',
+    'short name + size',
+  )
+  const long = titleLines('Circular Round Backdrop Extra Wide')
+  console.assert(long.length === 2, 'titleLines should split long names', long)
 }
