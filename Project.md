@@ -47,10 +47,10 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - Card product name: **max 2 lines** total (includes trailing `[size]`) then `…` truncate
 - **Open in gallery** ↔ **Prices starting from ₹499** (arms with the same ≥0.5s in-view rule)
-- Promo carousel under blue header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **100%**; sides **90%** + **75%** opacity; non-interactive; intro with cards
-- End badge: Handcrafted / & made with love (padding top 24 / bottom **16**; list clears sticky contact bar)
+- Promo carousel under blue header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **100%**; sides **90%** + **75%** opacity; caption blur **12→0** bottom→top; labels **Ready to Install** / **Quality Materials Used** / **Handcrafted with Love**; non-interactive; intro with cards
+- End badge: Handcrafted / & made with love (no extra top/bottom pad); list top/bottom inset **120px**; clears sticky contact bar
 - Site `bg.png` at **75%** opacity
-- Sticky home contact bar (Figma `Bottom Bar` / 7:82): Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap; content always **center-aligned** (icon left, number right); while scrolling collapses to **48×48** icons at opposite ends; on idle expands with ease-in-out; **home only** — gallery keeps wave `GreenFooter`
+- Sticky home contact bar (Figma `Bottom Bar` / 7:82): appears only after home card intro is **done**; Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap + **drop shadow** `0 4 16 rgba(0,0,0,0.15)`; content always **center-aligned** (icon left, number right); after **1s** of scrolling collapses to **48×48** icons (slow **1s** ease); after **1s** idle expands the same way; **home only** — gallery keeps wave `GreenFooter`
 - No green wave WhatsApp footer on Home
 
 ### Gallery

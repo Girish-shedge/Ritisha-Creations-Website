@@ -98,8 +98,13 @@ const WAVE_AR = 393 / 87.3859
 const WA_NUMBER = '918766630191'
 const CALL_NUMBER = '9272517248'
 const HOME_WA_MSG = 'Hey, I am interested in the designs'
-/** Figma Bottom Bar: py-24 + pill; stacked (&lt;300px) needs two pills + 24 gap */
-const HOME_CONTACT_BAR_H = 168
+/** Home list bottom inset — reserves Call/WhatsApp bar + gap */
+const HOME_CONTACT_BAR_H = 120
+/** Home list top inset under absolute header */
+const HOME_SCROLL_PAD_TOP = 120
+/** Wait this long while scrolling before collapsing; same idle before expand */
+const HOME_BAR_SETTLE_MS = 1000
+const HOME_BAR_EASE = '1000ms ease-in-out'
 function waUrl(message: string) {
   return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`
 }
@@ -124,9 +129,9 @@ const T_CARDS_GAP = 900   // after cards start, then enable scroll
 
 /** Home promo strip — Figma 14:139 / 14:143 / 14:141 (361×203.172 Subtract). */
 const PROMO_SLIDES = [
-  { src: promo01, label: 'READY TO INSTALL' },
-  { src: promo02, label: 'Quality materials used' },
-  { src: promo03, label: 'Handcrafted with love' },
+  { src: promo01, label: 'Ready to Install' },
+  { src: promo02, label: 'Quality Materials Used' },
+  { src: promo03, label: 'Handcrafted with Love' },
 ] as const
 const PROMO_GAP = 16
 const PROMO_WIDTH_FRAC = 0.8
@@ -135,6 +140,8 @@ const PROMO_EASE_MS = 900
 const PROMO_AR = PROMO_W / PROMO_H
 const PROMO_LABEL_PX = 18
 const PROMO_BLUR_PX = 12
+/** Figma 7:82 drop shadow on Call / WhatsApp pills */
+const HOME_PILL_SHADOW = '0px 4px 16px 0px rgba(0,0,0,0.15)'
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -627,7 +634,6 @@ function HandcraftedBadge() {
   return (
     <div
       className="relative w-full flex justify-center"
-      style={{ paddingTop: 24, paddingBottom: 16 }}
       aria-label="Handcrafted and made with love"
     >
       <div
@@ -1212,7 +1218,7 @@ function CategoryCard({
 }
 
 /** Home-only Call + WhatsApp bar — Figma 7:82. Collapses to 48×48 icons while scrolling. */
-function HomeContactBar({ compact }: { compact: boolean }) {
+function HomeContactBar({ compact, visible }: { compact: boolean; visible: boolean }) {
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef(0)
 
@@ -1237,7 +1243,7 @@ function HomeContactBar({ compact }: { compact: boolean }) {
     }, 180)
   }
 
-  const ease = '420ms ease-in-out'
+  const ease = HOME_BAR_EASE
   // Pills stay content-centered; icon left, number right. Outer bar uses space-between when compact.
   const pillStyle: React.CSSProperties = {
     position: 'relative',
@@ -1252,7 +1258,8 @@ function HomeContactBar({ compact }: { compact: boolean }) {
     gap: compact ? 0 : 4,
     padding: compact ? 0 : '0 16px',
     borderRadius: 40,
-    transition: `flex ${ease}, width ${ease}, padding ${ease}, gap ${ease}`,
+    boxShadow: HOME_PILL_SHADOW,
+    transition: `flex ${ease}, width ${ease}, padding ${ease}, gap ${ease}, box-shadow ${ease}`,
   }
   const labelStyle: React.CSSProperties = {
     fontFamily: FONT_BOLD,
@@ -1273,11 +1280,19 @@ function HomeContactBar({ compact }: { compact: boolean }) {
   return (
     <div
       className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(12px)',
+        transition: `opacity ${ease}, transform ${ease}`,
+        pointerEvents: visible ? undefined : 'none',
+      }}
+      aria-hidden={!visible}
     >
       <div
         className="pointer-events-auto relative flex w-full flex-row items-center justify-between gap-6 px-4 py-6"
         data-name="Bottom Bar"
+        style={{ pointerEvents: visible ? 'auto' : 'none' }}
       >
         {toast && (
           <div
@@ -1453,14 +1468,14 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
                 className="absolute inset-0 size-full object-cover object-center block"
                 style={{ maxWidth: 'none' }}
               />
-              {/* Caption bar — Figma Subtract + blur 12 / label 18px */}
+              {/* Caption bar — shape mask; blur 12→0 bottom→top */}
               <div
                 className="absolute inset-x-0 bottom-0 flex items-center justify-center"
                 style={{ height: captionH ?? `${(PROMO_CAPTION_H / PROMO_H) * 100}%` }}
               >
                 <div
                   aria-hidden
-                  className="absolute inset-0"
+                  className="absolute inset-0 overflow-hidden"
                   style={{
                     WebkitMaskImage: PROMO_CAPTION_MASK,
                     maskImage: PROMO_CAPTION_MASK,
@@ -1468,12 +1483,34 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
                     maskSize: '100% 100%',
                     WebkitMaskRepeat: 'no-repeat',
                     maskRepeat: 'no-repeat',
-                    backdropFilter: `blur(${PROMO_BLUR_PX}px)`,
-                    WebkitBackdropFilter: `blur(${PROMO_BLUR_PX}px)`,
-                    background:
-                      'linear-gradient(to top, rgba(102,73,48,0.25), rgba(184,118,64,0.25))',
                   }}
-                />
+                >
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backdropFilter: `blur(${PROMO_BLUR_PX}px)`,
+                      WebkitBackdropFilter: `blur(${PROMO_BLUR_PX}px)`,
+                      maskImage: 'linear-gradient(to top, #000 0%, transparent 100%)',
+                      WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 100%)',
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backdropFilter: `blur(${PROMO_BLUR_PX / 2}px)`,
+                      WebkitBackdropFilter: `blur(${PROMO_BLUR_PX / 2}px)`,
+                      maskImage: 'linear-gradient(to top, transparent 0%, #000 40%, transparent 85%)',
+                      WebkitMaskImage: 'linear-gradient(to top, transparent 0%, #000 40%, transparent 85%)',
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(to top, rgba(102,73,48,0.25), rgba(184,118,64,0.25))',
+                    }}
+                  />
+                </div>
                 <p
                   className="relative m-0 text-center text-white whitespace-nowrap"
                   style={{
@@ -1507,14 +1544,12 @@ interface HomeScreenProps {
 function HomeScreen({
   categories, onViewAll, introPhase, setIntroPhase, restoreScrollTop, onScrollTopChange,
 }: HomeScreenProps) {
-  const headerRef = useRef<HTMLDivElement>(null)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const restoredRef = useRef(false)
-  const scrollIdleTimer = useRef(0)
+  const barCompactTimer = useRef(0)
+  const barExpandTimer = useRef(0)
   const [scrolled, setScrolled] = useState(false)
   const [barCompact, setBarCompact] = useState(false)
-  const [headerH, setHeaderH] = useState(() =>
-    typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) / WAVE_AR : 0)
 
   const pastChrome = introPhase === 'cards' || introPhase === 'done'
   const [headerPlay, setHeaderPlay] = useState(
@@ -1545,16 +1580,10 @@ function HomeScreen({
     return () => clearTimeout(t)
   }, [introPhase, setIntroPhase])
 
-  useLayoutEffect(() => {
-    const measure = () => {
-      if (headerRef.current) setHeaderH(headerRef.current.offsetHeight)
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    return () => window.removeEventListener('resize', measure)
+  useEffect(() => () => {
+    window.clearTimeout(barCompactTimer.current)
+    window.clearTimeout(barExpandTimer.current)
   }, [])
-
-  useEffect(() => () => window.clearTimeout(scrollIdleTimer.current), [])
 
   // Instant scroll restore when returning from gallery (no ease animation)
   useLayoutEffect(() => {
@@ -1570,12 +1599,13 @@ function HomeScreen({
 
   const cardsVisible = introPhase === 'cards' || introPhase === 'done'
   const scrollable = introPhase === 'done'
+  const contactVisible = introPhase === 'done'
 
   return (
     <div className="relative size-full overflow-hidden">
       <BgImage />
 
-      <div ref={headerRef} className="absolute top-0 left-0 right-0 z-30" style={{ aspectRatio: `${WAVE_AR}` }}>
+      <div className="absolute top-0 left-0 right-0 z-30" style={{ aspectRatio: `${WAVE_AR}` }}>
         <BlueHeader
           label="Rittisha Creations"
           scrolled={scrolled}
@@ -1589,7 +1619,7 @@ function HomeScreen({
         ref={scrollerRef}
         className="absolute inset-0 overflow-y-auto scroll-smooth"
         style={{
-          paddingTop: headerH + 16,
+          paddingTop: HOME_SCROLL_PAD_TOP,
           paddingBottom: `calc(${HOME_CONTACT_BAR_H}px + env(safe-area-inset-bottom, 0px))`,
           overflowY: scrollable ? 'auto' : 'hidden',
         }}
@@ -1598,9 +1628,19 @@ function HomeScreen({
           const y = e.currentTarget.scrollTop
           setScrolled(y > 8)
           onScrollTopChange?.(y)
-          setBarCompact(true)
-          window.clearTimeout(scrollIdleTimer.current)
-          scrollIdleTimer.current = window.setTimeout(() => setBarCompact(false), 180)
+          // 1s of scroll activity → compact; 1s idle → expand (both ease slowly)
+          window.clearTimeout(barExpandTimer.current)
+          if (!barCompactTimer.current) {
+            barCompactTimer.current = window.setTimeout(() => {
+              barCompactTimer.current = 0
+              setBarCompact(true)
+            }, HOME_BAR_SETTLE_MS)
+          }
+          barExpandTimer.current = window.setTimeout(() => {
+            window.clearTimeout(barCompactTimer.current)
+            barCompactTimer.current = 0
+            setBarCompact(false)
+          }, HOME_BAR_SETTLE_MS)
         }}
       >
         <div className="flex flex-col gap-10 items-center pt-4">
@@ -1623,7 +1663,7 @@ function HomeScreen({
         </div>
       </div>
 
-      <HomeContactBar compact={barCompact} />
+      <HomeContactBar compact={barCompact} visible={contactVisible} />
     </div>
   )
 }
