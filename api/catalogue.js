@@ -4,23 +4,20 @@
  *      GOOGLE_API_REFERER / VITE_GOOGLE_API_REFERER
  */
 
+import { driveApiKey, driveFolderId, driveReferer } from './driveEnv.js'
+
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
 
 function apiKey() {
-  return process.env.VITE_GOOGLE_DRIVE_API_KEY || process.env.GOOGLE_API_KEY
+  return driveApiKey()
 }
 
 function rootFolderId() {
-  return process.env.VITE_DRIVE_FOLDER_ID || process.env.GOOGLE_DRIVE_FOLDER_ID || '1blEF1JY8k4fGg66R_O1ZcSyN6wFHz9W8'
+  return driveFolderId()
 }
 
 function referer() {
-  return (
-    process.env.GOOGLE_API_REFERER ||
-    process.env.VITE_GOOGLE_API_REFERER ||
-    // Must match a host allowlisted on the Drive API key (legacy one-t still listed).
-    'https://ritishacreations.vercel.app/'
-  )
+  return driveReferer()
 }
 
 function slugify(name) {

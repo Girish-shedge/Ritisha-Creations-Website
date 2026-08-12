@@ -2,6 +2,8 @@
  * Proxies a public Drive file for <img> / share use.
  * Env: VITE_GOOGLE_DRIVE_API_KEY or GOOGLE_API_KEY
  */
+import { driveApiKey, driveReferer } from './driveEnv.js'
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.statusCode = 405
@@ -16,17 +18,14 @@ export default async function handler(req, res) {
     return
   }
 
-  const key = process.env.VITE_GOOGLE_DRIVE_API_KEY || process.env.GOOGLE_API_KEY
+  const key = driveApiKey()
   if (!key) {
     res.statusCode = 500
     res.end('Missing API key')
     return
   }
 
-  const referer =
-    process.env.GOOGLE_API_REFERER ||
-    process.env.VITE_GOOGLE_API_REFERER ||
-    'https://ritishacreations.vercel.app/'
+  const referer = driveReferer()
 
   const upstream = await fetch(
     `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${key}&supportsAllDrives=true`,

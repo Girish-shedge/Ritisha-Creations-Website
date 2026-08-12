@@ -45,7 +45,9 @@ pnpm preview
 |----------|---------|
 | `VITE_GOOGLE_DRIVE_API_KEY` | Drive API key (client listing via `/api/catalogue`) |
 | `VITE_DRIVE_FOLDER_ID` | Root folder — one **subfolder per category** |
-| `GOOGLE_API_REFERER` | Optional; server Referer for Drive (see `api/catalogue.js`) |
+| `GOOGLE_API_REFERER` | Optional; must be allowlisted on the API key (default: legacy one-t host via `api/driveEnv.js`) |
+
+`pnpm build` runs `scripts/drive-referer-check.mjs` (static + live Drive probe) so a blocked Referer fails before deploy.
 
 Photos are **not** committed. They load from Googleusercontent CDN (`lh3…/d/{id}=wN`). Placeholder cream shows until each image decodes; session cache skips the flash on revisit.
 

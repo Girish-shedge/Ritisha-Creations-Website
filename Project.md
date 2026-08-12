@@ -47,10 +47,10 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - Card product name: **max 2 lines** total (includes trailing `[size]`) then `…` truncate
 - **Open in gallery** ↔ **Prices starting from ₹499** (arms with the same ≥0.5s in-view rule)
-- Promo carousel under blue header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; slides **75%** column width; **12px** gap; infinite forward every **2s** (no reverse); center **100%**; sides **90%** + **75%** opacity; non-interactive; intro with cards
+- Promo carousel under blue header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **100%**; sides **90%** + **75%** opacity; non-interactive; intro with cards
 - End badge: Handcrafted / & made with love (padding top 24 / bottom **16**; list clears sticky contact bar)
 - Site `bg.png` at **75%** opacity
-- Sticky home contact bar (Figma `Bottom Bar` / 7:82): Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap (stack vertically below **300px**); while scrolling collapses to **48×48** icons at opposite ends (`justify-between`, ease-in-out), expands to icon+number on scroll idle; **home only** — gallery keeps wave `GreenFooter`
+- Sticky home contact bar (Figma `Bottom Bar` / 7:82): Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap; content always **center-aligned** (icon left, number right); while scrolling collapses to **48×48** icons at opposite ends; on idle expands with ease-in-out; **home only** — gallery keeps wave `GreenFooter`
 - No green wave WhatsApp footer on Home
 
 ### Gallery
@@ -96,6 +96,7 @@ Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill 
 - `viewport-fit=cover` in `index.html`; safe-area inset under gallery wave footer only (no green rectangle pad).
 - Test **iOS Chrome + Safari** and Android: green footer CTA text, shloka **both** borders, letter shadow/glow, card blur following cuts.
 - After every `vercel deploy --prod`, alias **`rittishacreations.vercel.app`** (two t’s). Vercel often aliases the old one-t host (`ritishacreations.vercel.app`) instead.
+- Drive Referer: shared `api/driveEnv.js`; `pnpm build` runs `scripts/drive-referer-check.mjs` (blocks two-t Referer drift + live probes the allowlisted host).
 
 ---
 

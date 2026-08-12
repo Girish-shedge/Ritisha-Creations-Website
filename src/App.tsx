@@ -75,6 +75,13 @@ const PROMO_FRAME =
 const PROMO_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROMO_W} ${PROMO_H}"><path fill="white" d="${PROMO_FRAME}"/></svg>`,
 )}")`
+/** Figma caption Subtract — bar + frosted blur under label. */
+const PROMO_CAPTION_H = 45.9067
+const PROMO_CAPTION =
+  'M361 25.8169C349.307 25.8169 341.027 35.6552 341.027 45.9057H20.1757C20.1757 34.4645 10.3652 25.8331 0 25.8331V0H361V25.8169Z'
+const PROMO_CAPTION_MASK = `url("data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROMO_W} ${PROMO_CAPTION_H}"><path fill="white" d="${PROMO_CAPTION}"/></svg>`,
+)}")`
 
 // Half-path strokes: centre peak → outer corner (draw outward L+R simultaneously).
 const HEADER_LEFT =
@@ -115,12 +122,19 @@ const T_HEADER_INTRO = T_TRACE_DUR + T_FILL_DUR + T_MARK_DUR + T_TEXT_DUR
 const T_CARDS_AT = Math.round(T_HEADER_INTRO * 0.6)
 const T_CARDS_GAP = 900   // after cards start, then enable scroll
 
-/** Home promo strip — Figma 14:141 / 14:139 / 14:143 (361×203.172 Subtract). */
-const PROMO_IMGS = [promo01, promo02, promo03]
-const PROMO_GAP = 12
-const PROMO_WIDTH_FRAC = 0.75
-const PROMO_MS = 2000
+/** Home promo strip — Figma 14:139 / 14:143 / 14:141 (361×203.172 Subtract). */
+const PROMO_SLIDES = [
+  { src: promo01, label: 'READY TO INSTALL' },
+  { src: promo02, label: 'Quality materials used' },
+  { src: promo03, label: 'Handcrafted with love' },
+] as const
+const PROMO_GAP = 16
+const PROMO_WIDTH_FRAC = 0.8
+const PROMO_MS = 2800
+const PROMO_EASE_MS = 900
 const PROMO_AR = PROMO_W / PROMO_H
+const PROMO_LABEL_PX = 18
+const PROMO_BLUR_PX = 12
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -1223,12 +1237,14 @@ function HomeContactBar({ compact }: { compact: boolean }) {
     }, 180)
   }
 
-  const ease = '320ms ease-in-out'
+  const ease = '420ms ease-in-out'
+  // Pills stay content-centered; icon left, number right. Outer bar uses space-between when compact.
   const pillStyle: React.CSSProperties = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
     overflow: 'hidden',
     height: 48,
     width: compact ? 48 : undefined,
@@ -1250,6 +1266,9 @@ function HomeContactBar({ compact }: { compact: boolean }) {
     overflow: 'hidden',
     transition: `max-width ${ease}, opacity ${ease}`,
   }
+  const iconBox: React.CSSProperties = compact
+    ? { width: 48, height: 48, padding: 12 }
+    : { width: 24, height: 24, padding: 0 }
 
   return (
     <div
@@ -1257,13 +1276,8 @@ function HomeContactBar({ compact }: { compact: boolean }) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div
-        className={
-          compact
-            ? 'pointer-events-auto relative flex w-full flex-row items-center justify-between px-4 py-6'
-            : 'pointer-events-auto relative flex w-full flex-col gap-6 px-4 py-6 min-[300px]:flex-row min-[300px]:items-start'
-        }
+        className="pointer-events-auto relative flex w-full flex-row items-center justify-between gap-6 px-4 py-6"
         data-name="Bottom Bar"
-        style={{ transition: `gap ${ease}` }}
       >
         {toast && (
           <div
@@ -1292,9 +1306,7 @@ function HomeContactBar({ compact }: { compact: boolean }) {
           <span
             className="relative shrink-0 overflow-hidden"
             style={{
-              width: compact ? 48 : 24,
-              height: compact ? 48 : 24,
-              padding: compact ? 12 : 0,
+              ...iconBox,
               boxSizing: 'border-box',
               transition: `width ${ease}, height ${ease}, padding ${ease}`,
             }}
@@ -1325,9 +1337,7 @@ function HomeContactBar({ compact }: { compact: boolean }) {
           <span
             className="relative shrink-0 overflow-hidden"
             style={{
-              width: compact ? 48 : 24,
-              height: compact ? 48 : 24,
-              padding: compact ? 12 : 0,
+              ...iconBox,
               boxSizing: 'border-box',
               transition: `width ${ease}, height ${ease}, padding ${ease}`,
             }}
@@ -1343,13 +1353,13 @@ function HomeContactBar({ compact }: { compact: boolean }) {
   )
 }
 
-/** Non-interactive home promo — Figma Subtract shape; 75% width; 12px gap; infinite forward. */
+/** Non-interactive home promo — Figma Subtract; full-bleed; 80% center; 16px gap; slow ease. */
 function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number }) {
-  const n = PROMO_IMGS.length
-  const track = useMemo(() => [...PROMO_IMGS, ...PROMO_IMGS, ...PROMO_IMGS], [])
+  const n = PROMO_SLIDES.length
+  const track = useMemo(() => [...PROMO_SLIDES, ...PROMO_SLIDES, ...PROMO_SLIDES], [])
   const rootRef = useRef<HTMLDivElement>(null)
   // Start in the middle copy so left + right neighbors always exist
-  const [i, setI] = useState(n)
+  const [i, setI] = useState<number>(n)
   const [anim, setAnim] = useState(true)
   const [boxW, setBoxW] = useState(0)
 
@@ -1379,11 +1389,15 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
     setI((v) => v - n)
   }
 
-  // Hard size from Figma aspect; width is always 75% of the home column
   const slideW = boxW > 0 ? boxW * PROMO_WIDTH_FRAC : 0
   const slideH = slideW > 0 ? slideW * (PROMO_H / PROMO_W) : 0
   const step = slideW + PROMO_GAP
   const tx = slideW > 0 ? (boxW - slideW) / 2 - i * step : 0
+  const moveEase = anim && slideW > 0 ? `transform ${PROMO_EASE_MS}ms ease-in-out` : 'none'
+  const slideEase = anim
+    ? `transform ${PROMO_EASE_MS}ms ease-in-out, opacity ${PROMO_EASE_MS}ms ease-in-out`
+    : 'none'
+  const captionH = slideH > 0 ? slideH * (PROMO_CAPTION_H / PROMO_H) : undefined
 
   return (
     <div
@@ -1408,18 +1422,18 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
         style={{
           gap: PROMO_GAP,
           transform: `translateX(${tx}px)`,
-          transition: anim && slideW > 0 ? 'transform 480ms ease-in-out' : 'none',
+          transition: moveEase,
           willChange: 'transform',
         }}
       >
-        {track.map((src, idx) => {
+        {track.map((slide, idx) => {
           const active = idx === i
           return (
             <div
               key={idx}
               className="relative shrink-0 overflow-hidden"
               style={{
-                width: slideW || '75%',
+                width: slideW || `${PROMO_WIDTH_FRAC * 100}%`,
                 height: slideH || '100%',
                 WebkitMaskImage: PROMO_FRAME_MASK,
                 maskImage: PROMO_FRAME_MASK,
@@ -1429,18 +1443,49 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
                 maskRepeat: 'no-repeat',
                 transform: `scale(${active ? 1 : 0.9})`,
                 opacity: active ? 1 : 0.75,
-                transition: anim
-                  ? 'transform 480ms ease-in-out, opacity 480ms ease-in-out'
-                  : 'none',
+                transition: slideEase,
               }}
             >
               <img
-                src={src}
+                src={slide.src}
                 alt=""
                 draggable={false}
                 className="absolute inset-0 size-full object-cover object-center block"
                 style={{ maxWidth: 'none' }}
               />
+              {/* Caption bar — Figma Subtract + blur 12 / label 18px */}
+              <div
+                className="absolute inset-x-0 bottom-0 flex items-center justify-center"
+                style={{ height: captionH ?? `${(PROMO_CAPTION_H / PROMO_H) * 100}%` }}
+              >
+                <div
+                  aria-hidden
+                  className="absolute inset-0"
+                  style={{
+                    WebkitMaskImage: PROMO_CAPTION_MASK,
+                    maskImage: PROMO_CAPTION_MASK,
+                    WebkitMaskSize: '100% 100%',
+                    maskSize: '100% 100%',
+                    WebkitMaskRepeat: 'no-repeat',
+                    maskRepeat: 'no-repeat',
+                    backdropFilter: `blur(${PROMO_BLUR_PX}px)`,
+                    WebkitBackdropFilter: `blur(${PROMO_BLUR_PX}px)`,
+                    background:
+                      'linear-gradient(to top, rgba(102,73,48,0.25), rgba(184,118,64,0.25))',
+                  }}
+                />
+                <p
+                  className="relative m-0 text-center text-white whitespace-nowrap"
+                  style={{
+                    fontFamily: FONT_BOLD,
+                    fontSize: PROMO_LABEL_PX,
+                    letterSpacing: -0.16,
+                    lineHeight: 'normal',
+                  }}
+                >
+                  {slide.label}
+                </p>
+              </div>
             </div>
           )
         })}
@@ -1558,20 +1603,23 @@ function HomeScreen({
           scrollIdleTimer.current = window.setTimeout(() => setBarCompact(false), 180)
         }}
       >
-        <div className="flex flex-col gap-10 items-center px-4 pt-4">
+        <div className="flex flex-col gap-10 items-center pt-4">
+          {/* Full-bleed promo — outside the 16px card padding so edges aren't cropped */}
           <HomePromoCarousel visible={cardsVisible} delay={0} />
-          {categories.map((cat, i) => (
-            <CategoryCard
-              key={cat.id}
-              category={cat}
-              onViewAll={() => onViewAll(cat)}
-              introVisible={cardsVisible}
-              introDelay={(i + 1) * 180}
-              scrollerRef={scrollerRef}
-              scrollActive={scrollable}
-            />
-          ))}
-          <HandcraftedBadge />
+          <div className="flex w-full flex-col gap-10 items-center px-4">
+            {categories.map((cat, i) => (
+              <CategoryCard
+                key={cat.id}
+                category={cat}
+                onViewAll={() => onViewAll(cat)}
+                introVisible={cardsVisible}
+                introDelay={(i + 1) * 180}
+                scrollerRef={scrollerRef}
+                scrollActive={scrollable}
+              />
+            ))}
+            <HandcraftedBadge />
+          </div>
         </div>
       </div>
 

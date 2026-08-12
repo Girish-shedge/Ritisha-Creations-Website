@@ -5,6 +5,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 
 import siteConfiguration from './.figma/make/site.json'
+import { driveApiKey, driveReferer } from './api/driveEnv.js'
 
 function loadEnvLocal() {
   const p = path.resolve(__dirname, '.env.local')
@@ -46,16 +47,13 @@ function driveMediaProxy(): Plugin {
         res.end('Bad id')
         return
       }
-      const key = process.env.VITE_GOOGLE_DRIVE_API_KEY || process.env.GOOGLE_API_KEY
+      const key = driveApiKey()
       if (!key) {
         res.statusCode = 500
         res.end('Missing API key')
         return
       }
-      const referer =
-        process.env.GOOGLE_API_REFERER ||
-        process.env.VITE_GOOGLE_API_REFERER ||
-        'https://ritishacreations.vercel.app/'
+      const referer = driveReferer()
       const upstream = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${key}&supportsAllDrives=true`,
         { headers: { Referer: referer } },
