@@ -18,7 +18,8 @@ function referer() {
   return (
     process.env.GOOGLE_API_REFERER ||
     process.env.VITE_GOOGLE_API_REFERER ||
-    'https://rittishacreations.vercel.app/'
+    // Must match a host allowlisted on the Drive API key (legacy one-t still listed).
+    'https://ritishacreations.vercel.app/'
   )
 }
 
