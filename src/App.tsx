@@ -48,9 +48,12 @@ const GALLERY_NAV_MS = 520
 // ── Design tokens ─────────────────────────────────────────────
 const FONT_BOLD = "'Season Mix-TRIAL:Bold', 'Poppins', sans-serif"
 const FONT_SEMI = "'Season Mix-TRIAL:SemiBold', 'Poppins', sans-serif"
+/** Home header + gallery footer wave fill (Figma 34:1373 / 35:1374) */
+const CHROME_ORANGE = '#C3711A'
+const CHROME_BROWN = '#913C16'
 const FS_HEAD   = 36
 const FS_CHROME = 16
-const NAV_BTN = 40
+const NAV_BTN = 48
 
 // ── SVG paths (from Figma Extension V2: 298:141676 / 298:141678) ──
 // Header: flat top, bump hangs down. Footer: flat bottom, bump points up.
@@ -139,7 +142,7 @@ const PROMO_MS = 2800
 const PROMO_EASE_MS = 900
 const PROMO_AR = PROMO_W / PROMO_H
 const PROMO_LABEL_PX = 18
-const PROMO_BLUR_PX = 12
+const PROMO_BLUR_PX = 16
 /** Figma 7:82 drop shadow on Call / WhatsApp pills */
 const HOME_PILL_SHADOW = '0px 4px 16px 0px rgba(0,0,0,0.15)'
 
@@ -195,31 +198,6 @@ function BgImage() {
       loading="eager" fetchPriority="high" decoding="async"
       className="pointer-events-none absolute inset-0 size-full object-cover opacity-75"
     />
-  )
-}
-
-// ── Wave blur (exact Figma pattern) ───────────────────────────
-interface WaveBlurProps {
-  clipId: string; path: string
-  w?: number; h?: number
-  active: boolean; pathTransform?: string
-}
-function WaveBlur({ clipId, path, w = 393, h = 87.3859, active, pathTransform }: WaveBlurProps) {
-  const pad = 12
-  return (
-    <>
-      <foreignObject x={-pad} y={-pad} width={w + pad * 2} height={h + pad * 2}
-        style={{ opacity: active ? 1 : 0, transition: 'opacity 350ms ease-in-out' }}>
-        <div {...{ xmlns: 'http://www.w3.org/1999/xhtml' }}
-          style={{ backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
-                   clipPath: `url(#${clipId})`, height: '100%', width: '100%' }} />
-      </foreignObject>
-      <defs>
-        <clipPath id={clipId} transform={`translate(${pad} ${pad})`}>
-          <path d={path} transform={pathTransform} />
-        </clipPath>
-      </defs>
-    </>
   )
 }
 
@@ -358,7 +336,7 @@ function useChromeIntro(
 
 // ── Blue sticky header ────────────────────────────────────────
 function BlueHeader({
-  label, scrolled, playIntro, onIntroComplete, settleInstant = false,
+  label, scrolled: _scrolled, playIntro, onIntroComplete, settleInstant = false,
 }: {
   label: string
   scrolled: boolean
@@ -371,7 +349,7 @@ function BlueHeader({
     useChromeIntro(playIntro, onIntroComplete, { settleInstant })
 
   const stroke = strokeDrawProps({
-    color: '#007AB1',
+    color: CHROME_ORANGE,
     go: traceGo,
     visible: tracing,
     duration: T_TRACE_DUR,
@@ -384,7 +362,6 @@ function BlueHeader({
     <div className="relative w-full h-full">
       <svg className="absolute inset-0 size-full"
         viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-        {(settled || locked) && <WaveBlur clipId="blueH_wblur" path={HEADER} active={scrolled} />}
         <path
           d={HEADER}
           fill="url(#blueHGrad)"
@@ -397,7 +374,7 @@ function BlueHeader({
         <path d={HEADER_RIGHT} {...stroke} />
         <defs>
           <linearGradient id="blueHGrad" x1="196.5" y1="80.823" x2="196.5" y2="0" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#007AB1" /><stop offset="1" stopColor="#00579A" />
+            <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
           </linearGradient>
         </defs>
       </svg>
@@ -560,22 +537,20 @@ function GreenFooter({
   const waveH = Math.max(72, colW / WAVE_AR)
 
   const stroke = strokeDrawProps({
-    color: '#4CED77',
+    color: CHROME_ORANGE,
     go: traceGo,
     visible: tracing,
     duration: T_TRACE_DUR,
   })
 
-  // Once filled, keep the frosted green look — don't wait for the user to scroll
   const fillOn = showFill || locked || settled
-  const frosted = fillOn
 
   return (
     <a href={href} target="_blank" rel="noopener noreferrer"
       className="pointer-events-auto block w-full active:opacity-75" aria-label={aria}
       style={{
         visibility: visible ? 'visible' : 'hidden',
-        // Lift wave above home indicator only — no solid green pad under the footer
+        // Lift wave above home indicator only — no solid pad under the footer
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         boxSizing: 'content-box',
       }}>
@@ -586,12 +561,11 @@ function GreenFooter({
         <svg className="absolute inset-0 size-full"
           viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none"
           style={{ display: 'block' }}>
-          {frosted && <WaveBlur clipId={`${uid}_wblur`} path={FOOTER} active />}
           <path
             d={FOOTER}
             fill={`url(#${uid}_grad)`}
             style={{
-              fillOpacity: fillOn ? (frosted ? 0.75 : 1) : 0,
+              fillOpacity: fillOn ? 1 : 0,
               transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
             }}
           />
@@ -599,7 +573,7 @@ function GreenFooter({
           <path d={FOOTER_RIGHT} {...stroke} />
           <defs>
             <linearGradient id={`${uid}_grad`} x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#6CEB3E" /><stop offset="1" stopColor="#4CED77" />
+              <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
             </linearGradient>
           </defs>
         </svg>
@@ -620,7 +594,7 @@ function GreenFooter({
               fontWeight: 780,
               fontSize: FS_CHROME,
               lineHeight: 1.4,
-              color: '#0d2b08',
+              color: '#fff',
             }}
           />
         </span>
@@ -693,26 +667,58 @@ function HandcraftedBadge() {
 }
 
 function NavIconBtn({
-  label, onClick, src,
+  label, onClick, src, href, background, insetShadow,
 }: {
   label: string
-  onClick: () => void
+  onClick?: () => void
   src: string
+  /** When set, render as link (e.g. WhatsApp). */
+  href?: string
+  background?: string
+  insetShadow?: string
 }) {
+  const className = 'relative flex items-center justify-center shrink-0 overflow-hidden active:opacity-75'
+  const style: React.CSSProperties = {
+    width: NAV_BTN,
+    height: NAV_BTN,
+    borderRadius: 62,
+    background: background ?? 'linear-gradient(to top, #000 12.393%, #333)',
+  }
+  const inner = (
+    <>
+      {insetShadow && (
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-[62px]"
+          style={{ boxShadow: insetShadow }}
+        />
+      )}
+      <img src={src} alt="" width={24} height={24} className="relative block size-6" draggable={false} />
+    </>
+  )
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={label}
+        className={className}
+        style={style}
+      >
+        {inner}
+      </a>
+    )
+  }
   return (
     <button
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex items-center justify-center shrink-0 active:opacity-75"
-      style={{
-        width: NAV_BTN,
-        height: NAV_BTN,
-        borderRadius: 62,
-        background: 'linear-gradient(to top, #000 12.393%, #333)',
-      }}
+      className={className}
+      style={style}
     >
-      <img src={src} alt="" width={24} height={24} className="block size-6" draggable={false} />
+      {inner}
     </button>
   )
 }
@@ -910,31 +916,6 @@ function CardBlurOverlay({ uid }: { uid: string }) {
         </svg>
       </div>
     </div>
-  )
-}
-
-// ── View-all button (fixed full width) ────────────────────────
-function ViewAllButton({
-  onClick, children, ariaLabel,
-}: {
-  onClick: () => void
-  children: React.ReactNode
-  ariaLabel?: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      className="flex w-full items-center justify-center overflow-hidden active:opacity-75"
-      style={{
-        paddingLeft: 16, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
-        borderRadius: 62,
-        background: 'linear-gradient(to top, #000 12.393%, #333)',
-      }}
-    >
-      {children}
-    </button>
   )
 }
 
@@ -1214,16 +1195,6 @@ function CategoryCard({
           </div>
         </div>
       </div>
-      <ViewAllButton
-        onClick={onViewAll}
-        ariaLabel="Open in gallery — Prices starting from ₹499"
-      >
-        <RotatingLines
-          lines={['Open in gallery', 'Prices starting from ₹499']}
-          active={armed}
-          style={{ fontFamily: FONT_BOLD, fontWeight: 780, fontSize: FS_CHROME, color: '#fff', lineHeight: 1.4 }}
-        />
-      </ViewAllButton>
     </div>
   )
 }
@@ -1467,8 +1438,8 @@ function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number
                 maskSize: '100% 100%',
                 WebkitMaskRepeat: 'no-repeat',
                 maskRepeat: 'no-repeat',
-                transform: `scale(${active ? 1 : 0.9})`,
-                opacity: active ? 1 : 0.75,
+                transform: `scale(${active ? 0.9 : 0.8})`,
+                opacity: 1,
                 transition: slideEase,
               }}
             >
@@ -1695,6 +1666,15 @@ function dist2(a: { x: number; y: number }, b: { x: number; y: number }) {
   return Math.hypot(dx, dy)
 }
 
+/** Keep zoomed image edges from leaving the viewport box. */
+function clampPan(scale: number, tx: number, ty: number, size: number) {
+  const max = Math.max(0, (size * (scale - 1)) / 2)
+  return {
+    tx: Math.min(max, Math.max(-max, tx)),
+    ty: Math.min(max, Math.max(-max, ty)),
+  }
+}
+
 function PhotoLightbox({
   photos, index, alt, onClose,
 }: {
@@ -1713,10 +1693,9 @@ function PhotoLightbox({
   const [gesturing, setGesturing] = useState(false)
   const [shown, setShown] = useState(false)
   const [leaving, setLeaving] = useState(false)
-  const [slidePct, setSlidePct] = useState(0)
-  const [sliding, setSliding] = useState(false)
   const zoomed = scale > 1.05
-  const busy = leaving || sliding
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [boxSize, setBoxSize] = useState(320)
 
   const ptr = useRef<{
     mode: 'none' | 'pan' | 'swipe' | 'pinch'
@@ -1730,7 +1709,6 @@ function PhotoLightbox({
   }>({ mode: 'none', x0: 0, y0: 0, tx0: 0, ty0: 0, s0: 1, pinDist: 0, lastTap: 0 })
   const touches = useRef<Map<number, { x: number; y: number }>>(new Map())
   const closeTimer = useRef(0)
-  const slideTimer = useRef(0)
 
   const resetZoom = useCallback(() => {
     setScale(1)
@@ -1740,7 +1718,22 @@ function PhotoLightbox({
     setDragY(0)
   }, [])
 
-  // Bounce in
+  const applyPan = useCallback((nx: number, ny: number, s = scale) => {
+    const c = clampPan(s, nx, ny, boxSize)
+    setTx(c.tx)
+    setTy(c.ty)
+  }, [scale, boxSize])
+
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const measure = () => setBoxSize(el.clientWidth || 320)
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => setShown(true))
@@ -1748,45 +1741,34 @@ function PhotoLightbox({
     return () => {
       cancelAnimationFrame(id)
       window.clearTimeout(closeTimer.current)
-      window.clearTimeout(slideTimer.current)
     }
   }, [])
+
+  useEffect(() => {
+    resetZoom()
+  }, [i, resetZoom])
 
   const requestClose = useCallback(() => {
     if (leaving) return
     setLeaving(true)
     setShown(false)
     resetZoom()
-    setDragX(0)
-    setDragY(0)
     closeTimer.current = window.setTimeout(onClose, LB_OUT_MS)
   }, [leaving, onClose, resetZoom])
 
   const go = useCallback((dir: number) => {
-    if (n <= 1 || leaving || sliding || scale > 1.05) return
-    setSliding(true)
-    setGesturing(false)
-    resetZoom()
-    setSlidePct(dir > 0 ? -108 : 108)
-    window.clearTimeout(slideTimer.current)
-    slideTimer.current = window.setTimeout(() => {
-      setI((v) => (v + dir + n) % n)
-      setSlidePct(dir > 0 ? 108 : -108)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setSlidePct(0)
-          slideTimer.current = window.setTimeout(() => setSliding(false), LB_SLIDE_MS)
-        })
-      })
-    }, LB_SLIDE_MS)
-  }, [n, leaving, sliding, scale, resetZoom])
+    if (n <= 1 || leaving || scale > 1.05) return
+    setI((v) => (v + dir + n) % n)
+    setDragX(0)
+    setDragY(0)
+  }, [n, leaving, scale])
 
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') requestClose()
-      if (leaving || sliding) return
+      if (leaving || zoomed) return
       if (e.key === 'ArrowRight' && n > 1) go(1)
       if (e.key === 'ArrowLeft' && n > 1) go(-1)
     }
@@ -1795,10 +1777,10 @@ function PhotoLightbox({
       document.body.style.overflow = prev
       window.removeEventListener('keydown', onKey)
     }
-  }, [requestClose, go, n, leaving, sliding])
+  }, [requestClose, go, n, leaving, zoomed])
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (busy) return
+    if (leaving) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
     e.stopPropagation()
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
@@ -1811,6 +1793,8 @@ function PhotoLightbox({
       g.mode = 'pinch'
       g.pinDist = dist2(pts[0], pts[1]) || 1
       g.s0 = scale
+      g.tx0 = tx
+      g.ty0 = ty
       return
     }
 
@@ -1824,7 +1808,7 @@ function PhotoLightbox({
   }
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (!touches.current.has(e.pointerId) || busy) return
+    if (!touches.current.has(e.pointerId) || leaving) return
     touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const g = ptr.current
 
@@ -1836,21 +1820,19 @@ function PhotoLightbox({
         g.mode = 'pinch'
         g.pinDist = d
         g.s0 = scale
+        g.tx0 = tx
+        g.ty0 = ty
       }
       const next = Math.min(LB_MAX, Math.max(1, g.s0 * (d / g.pinDist)))
       setScale(next)
-      if (next <= 1.02) {
-        setTx(0)
-        setTy(0)
-      }
+      applyPan(g.tx0, g.ty0, next)
       return
     }
 
     const dx = e.clientX - g.x0
     const dy = e.clientY - g.y0
     if (g.mode === 'pan') {
-      setTx(g.tx0 + dx)
-      setTy(g.ty0 + dy)
+      applyPan(g.tx0 + dx, g.ty0 + dy)
       return
     }
     if (g.mode === 'swipe') {
@@ -1880,51 +1862,61 @@ function PhotoLightbox({
     const mode = g.mode
     g.mode = 'none'
     setGesturing(false)
-    const dx = dragX
-    const dy = dragY
+    const dx = e.clientX - g.x0
+    const dy = e.clientY - g.y0
     setDragX(0)
     setDragY(0)
-    if (busy) return
+    if (leaving) return
+
+    const isTap = Math.abs(dx) < 10 && Math.abs(dy) < 10
+    const maybeToggleZoom = () => {
+      if (!isTap) return false
+      const now = Date.now()
+      if (now - g.lastTap < 320) {
+        g.lastTap = 0
+        if (scale > 1.1) resetZoom()
+        else {
+          setScale(LB_DBL)
+          applyPan(0, 0, LB_DBL)
+        }
+        return true
+      }
+      g.lastTap = now
+      return false
+    }
 
     if (mode === 'pinch') {
       if (scale < 1.08) resetZoom()
+      else applyPan(tx, ty, scale)
       return
     }
-    if (mode === 'pan') return
+    if (mode === 'pan') {
+      if (maybeToggleZoom()) return
+      applyPan(tx, ty, scale)
+      return
+    }
 
     if (mode === 'swipe') {
       if (dy > 90 && dy > Math.abs(dx) * 1.15) {
         requestClose()
         return
       }
-      if (n > 1 && Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy)) {
+      if (n > 1 && Math.abs(dx) > Math.max(48, boxSize * 0.18) && Math.abs(dx) > Math.abs(dy)) {
         go(dx < 0 ? 1 : -1)
         return
       }
-      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
-        const now = Date.now()
-        if (now - g.lastTap < 320) {
-          g.lastTap = 0
-          if (scale > 1.1) resetZoom()
-          else setScale(LB_DBL)
-          return
-        }
-        g.lastTap = now
-      }
+      maybeToggleZoom()
     }
   }
 
-  const photo = photos[i]
   const focusOn = shown && !leaving
   const backdropOp = focusOn
     ? (zoomed ? 1 : Math.max(0.4, 1 - Math.abs(dragY) / 280))
     : 0
-  const gestureEase = gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`
   const focusEase = leaving
     ? `transform ${LB_OUT_MS}ms ${LB_BOUNCE}, opacity ${LB_OUT_MS}ms ease-in-out`
     : `transform ${LB_IN_MS}ms ${LB_BOUNCE}, opacity ${LB_IN_MS}ms ease-in-out`
-  const w = typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) : 360
-  const dragSlide = zoomed || sliding ? 0 : (dragX / Math.max(w, 1)) * 100
+  const trackEase = gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`
 
   return (
     <div
@@ -1950,6 +1942,7 @@ function PhotoLightbox({
 
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
         <div
+          ref={boxRef}
           className="pointer-events-auto relative overflow-hidden"
           style={{
             width: 'min(100%, 100dvh - 48px)',
@@ -1969,21 +1962,41 @@ function PhotoLightbox({
           onPointerCancel={endPointer}
         >
           <div
-            className="absolute inset-0"
+            className="absolute inset-y-0 left-0 flex h-full"
             style={{
-              transform: `translateX(${slidePct + dragSlide}%) translate(${tx}px, ${ty}px) scale(${scale})`,
-              transition: gesturing ? 'none' : gestureEase,
+              width: `${n * 100}%`,
+              transform: `translateX(calc(-${i * (100 / n)}% + ${zoomed ? 0 : dragX}px))`,
+              transition: trackEase,
               willChange: 'transform',
-              transformOrigin: 'center center',
             }}
           >
-            <DriveImg
-              src={photo.full}
-              alt={`${alt} photo ${i + 1}`}
-              priority
-              className="absolute inset-0 size-full object-contain object-center block"
-              style={{ maxWidth: 'none' }}
-            />
+            {photos.map((photo, idx) => (
+              <div
+                key={photo.id}
+                className="relative h-full shrink-0 grow-0 overflow-hidden"
+                style={{ flexBasis: `${100 / n}%`, width: `${100 / n}%` }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    transform: idx === i
+                      ? `translate(${tx}px, ${ty}px) scale(${scale})`
+                      : 'none',
+                    transition: gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`,
+                    transformOrigin: 'center center',
+                    willChange: idx === i ? 'transform' : undefined,
+                  }}
+                >
+                  <DriveImg
+                    src={photo.full}
+                    alt={`${alt} photo ${idx + 1}`}
+                    priority={Math.abs(idx - i) <= 1}
+                    className="absolute inset-0 size-full object-contain object-center block"
+                    style={{ maxWidth: 'none' }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -2173,7 +2186,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
       <GalleryNavChrome visible={navIn}>
         <NavIconBtn label="Go back" onClick={onBack} src={iconBack} />
         <h1
-          className="flex-1 min-w-0 m-0 text-center text-white"
+          className="flex-1 min-w-0 m-0 text-left text-white"
           style={{
             fontFamily: FONT_SEMI,
             fontWeight: 670,
@@ -2183,15 +2196,26 @@ function GalleryScreen({ category, onBack, shellWidth }: {
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
+            paddingLeft: 4,
+            paddingRight: 8,
           }}
         >
           {category.galleryTitle}
         </h1>
-        <NavIconBtn
-          label={sharing ? 'Sharing…' : 'Share'}
-          onClick={onShare}
-          src={iconShare}
-        />
+        <div className="flex shrink-0 items-center" style={{ gap: 12 }}>
+          <NavIconBtn
+            label={sharing ? 'Sharing…' : 'Share'}
+            onClick={onShare}
+            src={iconShare}
+          />
+          <NavIconBtn
+            label={`WhatsApp about ${category.galleryTitle}`}
+            src="/icons/icon-whatsapp.svg"
+            href={waUrl(waCategoryMsg(category.galleryTitle))}
+            background="linear-gradient(to bottom, #25d366, #1ea952)"
+            insetShadow="inset 0px -2px 8px 0px rgba(77,224,132,0.5)"
+          />
+        </div>
       </GalleryNavChrome>
       <div className="absolute inset-0 z-10 overflow-y-auto">
         <div
@@ -2237,7 +2261,10 @@ function GalleryScreen({ category, onBack, shellWidth }: {
         <div className="pointer-events-auto w-full max-w-[480px]">
           <GreenFooter
             key={category.id}
-            label={['DM us for more information', 'Customization also available']}
+            label={[
+              'Customization also available',
+              'Prices starting from ₹499',
+            ]}
             href={waUrl(waCategoryMsg(category.galleryTitle))}
             playIntro
             onIntroComplete={() => setFooterReady(true)}

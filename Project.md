@@ -42,13 +42,12 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 ## Screens
 
 ### Home
-- Sticky blue wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`)
-- Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe changes photos; **tap photo frame** or **Open in gallery** button opens detail (always at Image 1)
+- Sticky orange/brown wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`); **no** frosted blur
+- Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe changes photos; **tap photo frame** opens detail (always at Image 1); **no** “Open in gallery” CTA under cards
 - Loading photos: white **श्री** `placeholder.png` (same as gallery) — no peach/orange wash behind it
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - Card product name: **max 2 lines** total (includes trailing `[size]`) then `…` truncate
-- **Open in gallery** ↔ **Prices starting from ₹499** (arms with the same ≥0.5s in-view rule)
-- Promo carousel under blue header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **100%**; sides **90%** + **75%** opacity; caption blur **12→0** bottom→top; labels **Ready to Install** / **Quality Materials Used** / **Handcrafted with Love**; non-interactive; intro with cards
+- Promo carousel under orange/brown header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **90% scale**; sides **80% scale** + **100% opacity**; caption progressive blur under text (~**16px** → 0 bottom→top); labels **Ready to Install** / **Quality Materials Used** / **Handcrafted with Love**; non-interactive; intro with cards
 - End badge: Handcrafted / & made with love (no extra top/bottom pad); list top/bottom inset **120px**; clears sticky contact bar
 - Site `bg.png` at **75%** opacity
 - Sticky home contact bar (Figma `Bottom Bar` / 7:82): appears only after home card intro is **done**; Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap + **drop shadow** `0 4 16 rgba(0,0,0,0.15)`; content always **center-aligned** (icon left, number right); after **1s** of scrolling collapses to **48×48** icons (slow **1s** ease); after **1s** idle expands the same way; **home only** — gallery keeps wave `GreenFooter`
@@ -56,16 +55,16 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 
 ### Gallery
 - Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
-- Circular back / share; truncated white title (`galleryTitle`)
+- Circular back / share / WhatsApp; truncated white title (`galleryTitle`) **left-aligned** between back and actions
 - Share: brand `og-image.png` **first** in the Web Share file list, then Image 1 (+ any warm extras); copy + category URL. `og:image` meta stays the brand mark (not the cover photo)
 - Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
-- Tap a photo → lightbox: centered image, black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×); double-tap toggles ~2.5×; at 1× swipe L/R slides next/prev, swipe down or tap dimmed sides to close
-- **Green footer must always be present** on every catalog detail open — **explicit px height** (`max(72, colW/WAVE_AR)`); do not rely on `aspect-ratio` + `%` height (collapses on some iOS WebViews)
+- Nav: back / share / WhatsApp at **48×48**; WhatsApp uses home green gradient + icon; **12px** gap before WhatsApp; opens same category WhatsApp message as footer
+- Tap a photo → lightbox: centered carousel track (neighbors visible while dragging), black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×) with edge-clamped pan; **double-tap toggles ~2.5× ↔ 1×** (works while zoomed too); at 1× swipe L/R changes photo, swipe down or tap dimmed sides to close
+- **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; WhatsApp link; **explicit px height** (`max(72, colW/WAVE_AR)`)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
 - Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
-- After fill, footer keeps the **frosted green** look immediately (blur + 0.75) — do not wait for list scroll
-- After intro + **0.5s**, rotates **DM us for more information** ↔ **Customization also available**
-- Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)` — no solid green pad under the CTA
+- After intro + **0.5s**, rotates the two footer lines
+- Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)` — no solid pad under the CTA
 
 Navigation: History API + **280ms** fade. Back → `/`.
 
