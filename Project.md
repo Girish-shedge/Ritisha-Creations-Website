@@ -43,7 +43,8 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 
 ### Home
 - Sticky blue wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`)
-- Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe overrides; dots **4→12×4**
+- Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe changes photos; **tap photo frame** or **Open in gallery** button opens detail (always at Image 1)
+- Loading photos: white **श्री** `placeholder.png` (same as gallery) — no peach/orange wash behind it
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - Card product name: **max 2 lines** total (includes trailing `[size]`) then `…` truncate
 - **Open in gallery** ↔ **Prices starting from ₹499** (arms with the same ≥0.5s in-view rule)
@@ -58,6 +59,7 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Circular back / share; truncated white title (`galleryTitle`)
 - Share: brand `og-image.png` **first** in the Web Share file list, then Image 1 (+ any warm extras); copy + category URL. `og:image` meta stays the brand mark (not the cover photo)
 - Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
+- Tap a photo → lightbox: centered image, black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×); double-tap toggles ~2.5×; at 1× swipe L/R slides next/prev, swipe down or tap dimmed sides to close
 - **Green footer must always be present** on every catalog detail open — **explicit px height** (`max(72, colW/WAVE_AR)`); do not rely on `aspect-ratio` + `%` height (collapses on some iOS WebViews)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
 - Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)

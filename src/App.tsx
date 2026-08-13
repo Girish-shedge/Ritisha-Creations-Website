@@ -15,7 +15,7 @@
  *   HomeContactBar                Home-only Call + WhatsApp pills (Figma 7:82)
  *   HomePromoCarousel             Home promo strip (Figma 14:141 / 14:139 / 14:143)
  *   RotatingLines                 CTA / footer copy rotator
- *   DriveImg / Card*              Photos, frame-masked blur, scroller, category card
+ *   DriveImg / Card* / PhotoLightbox  Photos, cards, gallery zoom viewer
  *   HomeScreen / GalleryScreen    Screens
  *   App (default export)          Root
  *
@@ -816,21 +816,11 @@ function DriveImg({
       className={className}
       style={{
         ...style,
-        background: '#E8D4C8',
+        background: '#fff',
       }}
       aria-busy={!showPhoto}
     >
-      {/* Always-visible cream base so empty/failed loads never look transparent */}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          background:
-            'linear-gradient(145deg, #F3E4DA 0%, #E0C4B4 45%, #D4B09E 100%)',
-          opacity: showPhoto ? 0 : 1,
-          transition: 'opacity 280ms ease-in-out',
-        }}
-      />
+      {/* Same श्री placeholder as gallery tiles — no peach wash that reads as an orange box */}
       <img
         src={placeholderImg}
         alt=""
@@ -983,13 +973,15 @@ function CardDots({ count, active }: { count: number; active: number }) {
 }
 
 function CardImageScroller({
-  photos, alt, onIndexChange, autoplay,
+  photos, alt, onIndexChange, autoplay, onOpen,
 }: {
   photos: CategoryPhoto[]
   alt: string
   onIndexChange?: (i: number) => void
   /** true after the card has stayed centred ≥1s */
   autoplay: boolean
+  /** Tap (not swipe) opens gallery — parent always opens at Image 1. */
+  onOpen?: () => void
 }) {
   const n = photos.length
   const track = n > 1 ? [...photos, photos[0]] : photos
@@ -998,7 +990,7 @@ function CardImageScroller({
   const [drag, setDrag] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [manual, setManual] = useState(false)
-  const startX = useRef<number | null>(null)
+  const startPtr = useRef<{ x: number; y: number; t: number } | null>(null)
   const active = i >= n ? 0 : i
   const canAuto = autoplay && !manual && n > 1
 
@@ -1048,23 +1040,32 @@ function CardImageScroller({
   }
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    startPtr.current = { x: e.clientX, y: e.clientY, t: Date.now() }
     if (n <= 1) return
-    startX.current = e.clientX
     setDragging(true)
     setDrag(0)
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent) => {
-    if (startX.current == null) return
-    setDrag(e.clientX - startX.current)
+    if (!startPtr.current || n <= 1) return
+    setDrag(e.clientX - startPtr.current.x)
   }
-  const onPointerUp = () => {
-    if (startX.current == null) return
-    const dx = drag
-    startX.current = null
+  const onPointerUp = (e: React.PointerEvent) => {
+    const s = startPtr.current
+    startPtr.current = null
+    if (!s) return
+    const dx = e.clientX - s.x
+    const dy = e.clientY - s.y
     setDragging(false)
     setDrag(0)
-    if (Math.abs(dx) > 40) goBy(dx < 0 ? 1 : -1)
+    if (n > 1 && Math.abs(dx) > 40 && Math.abs(dx) >= Math.abs(dy)) {
+      goBy(dx < 0 ? 1 : -1)
+      return
+    }
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && Date.now() - s.t < 450) {
+      onOpen?.()
+    }
   }
 
   const width = typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) : 360
@@ -1073,11 +1074,20 @@ function CardImageScroller({
   return (
     <div
       className="absolute inset-0 overflow-hidden"
+      role={onOpen ? 'button' : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      aria-label={onOpen ? `Open ${alt} gallery` : undefined}
+      onKeyDown={onOpen ? (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault()
+          onOpen()
+        }
+      } : undefined}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
-      style={{ touchAction: 'pan-y' }}
+      style={{ touchAction: 'pan-y', cursor: onOpen ? 'pointer' : undefined }}
     >
       <div
         className="flex h-full"
@@ -1177,6 +1187,7 @@ function CategoryCard({
             alt={category.galleryTitle}
             onIndexChange={onSlide}
             autoplay={armed}
+            onOpen={onViewAll}
           />
         </div>
         {/* Blur sits outside the frame mask — ancestor masks kill backdrop-filter */}
@@ -1668,10 +1679,359 @@ function HomeScreen({
   )
 }
 
-// ── Gallery photo tile ────────────────────────────────────────
-function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: string; priority?: boolean }) {
+// ── Gallery photo lightbox (phone-first) ──────────────────────
+const LB_MAX = 4
+const LB_DBL = 2.5
+const LB_IN_MS = 420
+const LB_OUT_MS = 340
+const LB_SLIDE_MS = 380
+/** Soft bounce + ease-in-out for focus in/out */
+const LB_BOUNCE = 'cubic-bezier(0.34, 1.4, 0.64, 1)'
+const LB_SLIDE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)'
+
+function dist2(a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = a.x - b.x
+  const dy = a.y - b.y
+  return Math.hypot(dx, dy)
+}
+
+function PhotoLightbox({
+  photos, index, alt, onClose,
+}: {
+  photos: CategoryPhoto[]
+  index: number
+  alt: string
+  onClose: () => void
+}) {
+  const n = photos.length
+  const [i, setI] = useState(index)
+  const [scale, setScale] = useState(1)
+  const [tx, setTx] = useState(0)
+  const [ty, setTy] = useState(0)
+  const [dragX, setDragX] = useState(0)
+  const [dragY, setDragY] = useState(0)
+  const [gesturing, setGesturing] = useState(false)
+  const [shown, setShown] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [slidePct, setSlidePct] = useState(0)
+  const [sliding, setSliding] = useState(false)
+  const zoomed = scale > 1.05
+  const busy = leaving || sliding
+
+  const ptr = useRef<{
+    mode: 'none' | 'pan' | 'swipe' | 'pinch'
+    x0: number
+    y0: number
+    tx0: number
+    ty0: number
+    s0: number
+    pinDist: number
+    lastTap: number
+  }>({ mode: 'none', x0: 0, y0: 0, tx0: 0, ty0: 0, s0: 1, pinDist: 0, lastTap: 0 })
+  const touches = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const closeTimer = useRef(0)
+  const slideTimer = useRef(0)
+
+  const resetZoom = useCallback(() => {
+    setScale(1)
+    setTx(0)
+    setTy(0)
+    setDragX(0)
+    setDragY(0)
+  }, [])
+
+  // Bounce in
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setShown(true))
+    })
+    return () => {
+      cancelAnimationFrame(id)
+      window.clearTimeout(closeTimer.current)
+      window.clearTimeout(slideTimer.current)
+    }
+  }, [])
+
+  const requestClose = useCallback(() => {
+    if (leaving) return
+    setLeaving(true)
+    setShown(false)
+    resetZoom()
+    setDragX(0)
+    setDragY(0)
+    closeTimer.current = window.setTimeout(onClose, LB_OUT_MS)
+  }, [leaving, onClose, resetZoom])
+
+  const go = useCallback((dir: number) => {
+    if (n <= 1 || leaving || sliding || scale > 1.05) return
+    setSliding(true)
+    setGesturing(false)
+    resetZoom()
+    setSlidePct(dir > 0 ? -108 : 108)
+    window.clearTimeout(slideTimer.current)
+    slideTimer.current = window.setTimeout(() => {
+      setI((v) => (v + dir + n) % n)
+      setSlidePct(dir > 0 ? 108 : -108)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSlidePct(0)
+          slideTimer.current = window.setTimeout(() => setSliding(false), LB_SLIDE_MS)
+        })
+      })
+    }, LB_SLIDE_MS)
+  }, [n, leaving, sliding, scale, resetZoom])
+
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') requestClose()
+      if (leaving || sliding) return
+      if (e.key === 'ArrowRight' && n > 1) go(1)
+      if (e.key === 'ArrowLeft' && n > 1) go(-1)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = prev
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [requestClose, go, n, leaving, sliding])
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (busy) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    e.stopPropagation()
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const g = ptr.current
+    setGesturing(true)
+
+    if (touches.current.size === 2) {
+      const pts = [...touches.current.values()]
+      g.mode = 'pinch'
+      g.pinDist = dist2(pts[0], pts[1]) || 1
+      g.s0 = scale
+      return
+    }
+
+    g.x0 = e.clientX
+    g.y0 = e.clientY
+    g.tx0 = tx
+    g.ty0 = ty
+    g.mode = zoomed ? 'pan' : 'swipe'
+    setDragX(0)
+    setDragY(0)
+  }
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!touches.current.has(e.pointerId) || busy) return
+    touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const g = ptr.current
+
+    if (touches.current.size >= 2 || g.mode === 'pinch') {
+      const pts = [...touches.current.values()]
+      if (pts.length < 2) return
+      const d = dist2(pts[0], pts[1]) || 1
+      if (g.mode !== 'pinch') {
+        g.mode = 'pinch'
+        g.pinDist = d
+        g.s0 = scale
+      }
+      const next = Math.min(LB_MAX, Math.max(1, g.s0 * (d / g.pinDist)))
+      setScale(next)
+      if (next <= 1.02) {
+        setTx(0)
+        setTy(0)
+      }
+      return
+    }
+
+    const dx = e.clientX - g.x0
+    const dy = e.clientY - g.y0
+    if (g.mode === 'pan') {
+      setTx(g.tx0 + dx)
+      setTy(g.ty0 + dy)
+      return
+    }
+    if (g.mode === 'swipe') {
+      setDragX(dx)
+      setDragY(dy)
+    }
+  }
+
+  const endPointer = (e: React.PointerEvent) => {
+    touches.current.delete(e.pointerId)
+    const g = ptr.current
+
+    if (touches.current.size >= 1) {
+      const rem = [...touches.current.values()][0]
+      if (rem) {
+        g.mode = scale > 1.05 ? 'pan' : 'swipe'
+        g.x0 = rem.x
+        g.y0 = rem.y
+        g.tx0 = tx
+        g.ty0 = ty
+        setDragX(0)
+        setDragY(0)
+      }
+      return
+    }
+
+    const mode = g.mode
+    g.mode = 'none'
+    setGesturing(false)
+    const dx = dragX
+    const dy = dragY
+    setDragX(0)
+    setDragY(0)
+    if (busy) return
+
+    if (mode === 'pinch') {
+      if (scale < 1.08) resetZoom()
+      return
+    }
+    if (mode === 'pan') return
+
+    if (mode === 'swipe') {
+      if (dy > 90 && dy > Math.abs(dx) * 1.15) {
+        requestClose()
+        return
+      }
+      if (n > 1 && Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy)) {
+        go(dx < 0 ? 1 : -1)
+        return
+      }
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+        const now = Date.now()
+        if (now - g.lastTap < 320) {
+          g.lastTap = 0
+          if (scale > 1.1) resetZoom()
+          else setScale(LB_DBL)
+          return
+        }
+        g.lastTap = now
+      }
+    }
+  }
+
+  const photo = photos[i]
+  const focusOn = shown && !leaving
+  const backdropOp = focusOn
+    ? (zoomed ? 1 : Math.max(0.4, 1 - Math.abs(dragY) / 280))
+    : 0
+  const gestureEase = gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`
+  const focusEase = leaving
+    ? `transform ${LB_OUT_MS}ms ${LB_BOUNCE}, opacity ${LB_OUT_MS}ms ease-in-out`
+    : `transform ${LB_IN_MS}ms ${LB_BOUNCE}, opacity ${LB_IN_MS}ms ease-in-out`
+  const w = typeof window !== 'undefined' ? Math.min(window.innerWidth, 480) : 360
+  const dragSlide = zoomed || sliding ? 0 : (dragX / Math.max(w, 1)) * 100
+
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '1 / 1' }}>
+    <div
+      className="fixed inset-0 z-[80]"
+      role="dialog"
+      aria-modal={true}
+      aria-label="Photo viewer"
+      style={{ left: '50%', transform: 'translateX(-50%)', width: '100%', maxWidth: 480 }}
+    >
+      <button
+        type="button"
+        aria-label="Close photo"
+        className="absolute inset-0 border-0 p-0 cursor-pointer"
+        style={{
+          background: 'rgba(0,0,0,0.72)',
+          backdropFilter: 'blur(18px)',
+          WebkitBackdropFilter: 'blur(18px)',
+          opacity: backdropOp,
+          transition: `opacity ${leaving ? LB_OUT_MS : LB_IN_MS}ms ease-in-out`,
+        }}
+        onClick={requestClose}
+      />
+
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+        <div
+          className="pointer-events-auto relative overflow-hidden"
+          style={{
+            width: 'min(100%, 100dvh - 48px)',
+            maxWidth: '100%',
+            aspectRatio: '1 / 1',
+            touchAction: 'none',
+            borderRadius: 4,
+            opacity: focusOn ? 1 : 0,
+            transform: focusOn
+              ? `translateY(${zoomed ? 0 : dragY}px) scale(1)`
+              : 'translateY(18px) scale(0.86)',
+            transition: focusEase,
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endPointer}
+          onPointerCancel={endPointer}
+        >
+          <div
+            className="absolute inset-0"
+            style={{
+              transform: `translateX(${slidePct + dragSlide}%) translate(${tx}px, ${ty}px) scale(${scale})`,
+              transition: gesturing ? 'none' : gestureEase,
+              willChange: 'transform',
+              transformOrigin: 'center center',
+            }}
+          >
+            <DriveImg
+              src={photo.full}
+              alt={`${alt} photo ${i + 1}`}
+              priority
+              className="absolute inset-0 size-full object-contain object-center block"
+              style={{ maxWidth: 'none' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {n > 1 && (
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] flex justify-center gap-1.5 pb-[max(20px,env(safe-area-inset-bottom))]"
+          aria-hidden
+          style={{
+            opacity: focusOn ? 1 : 0,
+            transition: `opacity ${leaving ? LB_OUT_MS : LB_IN_MS}ms ease-in-out`,
+          }}
+        >
+          {photos.map((p, idx) => (
+            <span
+              key={p.id}
+              className="block rounded-full"
+              style={{
+                width: idx === i ? 12 : 4,
+                height: 4,
+                background: idx === i ? '#fff' : 'rgba(255,255,255,0.45)',
+                transition: 'width 200ms ease-in-out',
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Gallery photo tile ────────────────────────────────────────
+function GalleryPhoto({
+  photo, alt, priority, onOpen,
+}: {
+  photo: CategoryPhoto
+  alt: string
+  priority?: boolean
+  onOpen?: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`View ${alt}`}
+      className="relative w-full overflow-hidden border-0 p-0 block cursor-zoom-in bg-transparent"
+      style={{ aspectRatio: '1 / 1' }}
+    >
       <DriveImg
         src={photo.full}
         alt={alt}
@@ -1679,7 +2039,7 @@ function GalleryPhoto({ photo, alt, priority }: { photo: CategoryPhoto; alt: str
         className="absolute inset-0 size-full object-cover object-center block"
         style={{ maxWidth: 'none' }}
       />
-    </div>
+    </button>
   )
 }
 
@@ -1742,6 +2102,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
   const [sharing, setSharing] = useState(false)
   const [navIn, setNavIn] = useState(false)
   const [showPhotos, setShowPhotos] = useState(false)
+  const [lightbox, setLightbox] = useState<number | null>(null)
 
   // Nav intro after paint; warm gallery images into session cache
   useEffect(() => {
@@ -1749,6 +2110,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
     setRotateReady(false)
     setNavIn(false)
     setShowPhotos(false)
+    setLightbox(null)
 
     prefetchCategoryShare(category)
     warmCategoryImages(category)
@@ -1846,10 +2208,19 @@ function GalleryScreen({ category, onBack, shellWidth }: {
               photo={photo}
               alt={`${category.galleryTitle} photo ${i + 1}`}
               priority={i < 2}
+              onOpen={() => setLightbox(i)}
             />
           ))}
         </div>
       </div>
+      {lightbox != null && (
+        <PhotoLightbox
+          photos={category.photos}
+          index={lightbox}
+          alt={category.galleryTitle}
+          onClose={() => setLightbox(null)}
+        />
+      )}
       {/* Fixed to the visible viewport bottom — survives 100vh / WebView chrome bugs */}
       <div
         className="pointer-events-none"
