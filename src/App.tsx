@@ -759,7 +759,7 @@ function DriveImg({
       }
     }
     const m = /[?&]id=([^&]+)/.exec(src)
-    const id = m?.[1] ? decodeURIComponent(m[1]) : null
+    const id = m?.[1] ? decodeURIComponent(m[1]) : ''
     if (!id) return [src]
     return [
       `https://lh3.googleusercontent.com/d/${id}=w1200`,
@@ -1918,11 +1918,10 @@ export default function App() {
         if (match) setSelected(match)
       }
 
-      // Warm all thumbs + fulls for this session (DriveImg skips placeholders once ready)
-      for (const c of next) {
-        prefetchCategoryShare(c)
-        warmCategoryImages(c)
-      }
+      // Warm CDN thumbs only — do NOT prefetch /api/media for every category here
+      // (that flooded serverless with N parallel Drive downloads on every home load).
+      // Share file prefetch runs when a gallery opens (see GalleryScreen).
+      for (const c of next) warmCategoryImages(c)
     })()
 
     if (deep) {

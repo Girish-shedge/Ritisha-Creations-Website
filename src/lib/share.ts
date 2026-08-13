@@ -39,6 +39,7 @@ function getBrandShareFile() {
 }
 
 async function fetchPhotoFile(id: string, name: string): Promise<File | null> {
+  // Same URL as <img> fallback so CDN cache is shared; server logs Sec-Fetch-Dest
   const urls = [
     `/api/media?id=${encodeURIComponent(id)}`,
     `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${import.meta.env.VITE_GOOGLE_DRIVE_API_KEY}`,

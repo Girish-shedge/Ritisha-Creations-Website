@@ -1,6 +1,14 @@
 {
   "buildCommand": "pnpm build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 15
+    }
+  },
+  "env": {
+    "NODE_OPTIONS": "--disable-warning=DEP0169"
+  },
   "redirects": [
     {
       "source": "/:path*",
