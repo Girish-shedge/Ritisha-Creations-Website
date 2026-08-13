@@ -16,3 +16,5 @@ logs/
 .figma/
 /imports/
 src/imports/
+
+.vercel
