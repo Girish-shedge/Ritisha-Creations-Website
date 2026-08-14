@@ -61,7 +61,7 @@ Browser
   → ShlokaIntro (home only; skipped on /{slug} deep links)
   → loadCatalogue() → GET /api/catalogue → Drive folders + Image N files
   → HomeScreen (cards) or GalleryScreen (photos)
-  → WhatsApp link on gallery green footer (always present on detail)
+  → Gallery header WhatsApp; wave footer is decorative (rotating copy)
 ```
 
 **Routing:** History API paths. `/` = home, `/{slug}` = that category’s gallery. `vercel.json` SPA rewrite.
@@ -132,7 +132,7 @@ Wired in `index.html` + `public/site.webmanifest`.
 
 ### Figma ↔ code names
 
-Code-built frames on Page 3 of **Extension - V2** use the same names as React (`HomeScreen`, `GalleryScreen`, `ShlokaIntro`, `BlueHeader`, `GreenFooter`, `CategoryCard`, `HandcraftedBadge`, …). Prefer those over generic `Frame 1580…` / `Screen N` when editing parity.
+Code-built frames on Page 3 of **Extension - V2** use the same names as React (`HomeScreen`, `GalleryScreen`, `ShlokaIntro`, `BlueHeader`, `GreenFooter`, `CategoryCard`, `HomeFooterBadge`, …). Prefer those over generic `Frame 1580…` / `Screen N` when editing parity.
 
 ### `App.tsx` sections (search for `──`)
 

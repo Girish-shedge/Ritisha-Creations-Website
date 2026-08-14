@@ -3,7 +3,6 @@ import { categoryUrl } from '@/data/categories'
 
 /** WhatsApp uses *text* for bold. */
 const SHARE_TEXT = 'Hey, check out this amazing piece by *Rittisha Creations*'
-const BRAND_SHARE_NAME = 'Rittisha-Creations.png'
 
 function extFor(mime: string) {
   if (mime.includes('png')) return 'png'
@@ -13,30 +12,6 @@ function extFor(mime: string) {
 }
 
 const fileCache = new Map<string, Promise<File | null>>()
-const settled = new Map<string, File | null>()
-let brandShareFile: Promise<File | null> | null = null
-
-async function fetchBrandShareFile(): Promise<File | null> {
-  // Prefer high-res share/OG art; fall back to PWA 512 then apple-touch
-  const urls = ['/icons/og-image.png', '/icons/icon-512.png', '/apple-touch-icon.png']
-  for (const url of urls) {
-    try {
-      const res = await fetch(url)
-      if (!res.ok) continue
-      const blob = await res.blob()
-      if (!blob.size) continue
-      return new File([blob], BRAND_SHARE_NAME, { type: blob.type || 'image/png' })
-    } catch {
-      // try next
-    }
-  }
-  return null
-}
-
-function getBrandShareFile() {
-  if (!brandShareFile) brandShareFile = fetchBrandShareFile()
-  return brandShareFile
-}
 
 async function fetchPhotoFile(id: string, name: string): Promise<File | null> {
   // Same URL as <img> fallback so CDN cache is shared; server logs Sec-Fetch-Dest
@@ -62,11 +37,7 @@ async function fetchPhotoFile(id: string, name: string): Promise<File | null> {
 
 export function prefetchShareFile(id: string, name: string) {
   if (!id || fileCache.has(id)) return
-  const p = fetchPhotoFile(id, name).then((f) => {
-    settled.set(id, f)
-    return f
-  })
-  fileCache.set(id, p)
+  fileCache.set(id, fetchPhotoFile(id, name))
 }
 
 function getShareFile(id: string, name: string) {
@@ -74,11 +45,9 @@ function getShareFile(id: string, name: string) {
   return fileCache.get(id)!
 }
 
-/** Prefetch brand art + Image 1 for snappy share sheets. */
+/** Prefetch every gallery photo for the share sheet (no brand / favicon). */
 export function prefetchCategoryShare(category: CategoryData) {
-  void getBrandShareFile()
-  const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
-  if (cover) prefetchShareFile(cover.id, cover.name || 'Image 1')
+  for (const p of category.photos) prefetchShareFile(p.id, p.name)
 }
 
 export async function shareCategory(category: CategoryData) {
@@ -86,36 +55,17 @@ export async function shareCategory(category: CategoryData) {
   // URL only in text — avoids WhatsApp duplicating via ShareData.url
   const text = `${SHARE_TEXT}\n${link}`
 
-  const brand = await getBrandShareFile()
-  const cover = category.photos.find((p) => p.id === category.coverId) ?? category.photos[0]
-  const coverFile = cover ? await getShareFile(cover.id, cover.name || 'Image 1') : null
-
-  const extras: File[] = []
+  const files: File[] = []
   for (const p of category.photos) {
-    if (!cover || p.id === cover.id) continue
-    const f = settled.get(p.id)
-    if (f) extras.push(f)
+    const f = await getShareFile(p.id, p.name)
+    if (f) files.push(f)
   }
 
-  // Brand image first so the share sheet preview is always श्री / site art
-  const files = [
-    ...(brand ? [brand] : []),
-    ...(coverFile ? [coverFile] : []),
-    ...extras,
-  ]
-
   try {
-    if (files.length > 1) {
-      const multi = { title: category.galleryTitle, text, files }
-      if (navigator.canShare?.(multi)) {
-        await navigator.share(multi)
-        return
-      }
-    }
-    if (files.length >= 1) {
-      const one = { title: category.galleryTitle, text, files: [files[0]] }
-      if (navigator.canShare?.(one)) {
-        await navigator.share(one)
+    for (let n = files.length; n >= 1; n--) {
+      const payload = { title: category.galleryTitle, text, files: files.slice(0, n) }
+      if (navigator.canShare?.(payload)) {
+        await navigator.share(payload)
         return
       }
     }
@@ -127,6 +77,4 @@ export async function shareCategory(category: CategoryData) {
   } catch {
     // cancelled
   }
-
-  for (const p of category.photos) prefetchShareFile(p.id, p.name)
 }

@@ -10,7 +10,7 @@ This file is the **product/behaviour** source of truth. For “how to run / wher
 
 ## What it is
 
-Two screens: **Home** (category cards) → **Gallery** (photos). Gallery footer CTA opens WhatsApp.
+Two screens: **Home** (category cards) → **Gallery** (photos). Gallery header WhatsApp opens a chat; the wave footer is decorative (rotating copy only).
 
 **WhatsApp:** `+918766630191`  
 **Gallery message:** `Hey, I am interested in {galleryTitle}`
@@ -42,29 +42,29 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 ## Screens
 
 ### Home
-- Sticky orange/brown wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`); **no** frosted blur
+- Sticky orange/brown wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`); **no** frosted blur; **gradient stroke** (white → transparent on the hanging bump, Figma 34:1373)
 - Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe changes photos; **tap photo frame** opens detail (always at Image 1); **no** “Open in gallery” CTA under cards
 - Loading photos: white **श्री** `placeholder.png` (same as gallery) — no peach/orange wash behind it
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
 - Card product name: **max 2 lines** total (includes trailing `[size]`) then `…` truncate
-- Promo carousel under orange/brown header (Figma 14:141 / 14:139 / 14:143): Subtract frame **361×203.172** hardcoded; **full-bleed** (not clipped by card `px-16`); slides **80%** column width; **16px** gap; infinite forward every **~2.8s** with **900ms** ease-in-out; center **90% scale**; sides **80% scale** + **100% opacity**; caption progressive blur under text (~**16px** → 0 bottom→top); labels **Ready to Install** / **Quality Materials Used** / **Handcrafted with Love**; non-interactive; intro with cards
-- End badge: Handcrafted / & made with love (no extra top/bottom pad); list top/bottom inset **120px**; clears sticky contact bar
+- **No** promo carousel
+- End of list has **no** Handcrafted badge (it lives in the sticky footer)
 - Site `bg.png` at **75%** opacity
-- Sticky home contact bar (Figma `Bottom Bar` / 7:82): appears only after home card intro is **done**; Call `9272517248` (copy → “Number copied” toast → `tel:+91…`) + WhatsApp `8766630191` (`Hey, I am interested in the designs`); full-width pills with **24px** gap + **drop shadow** `0 4 16 rgba(0,0,0,0.15)`; content always **center-aligned** (icon left, number right); after **1s** of scrolling collapses to **48×48** icons (slow **1s** ease); after **1s** idle expands the same way; **home only** — gallery keeps wave `GreenFooter`
+- Sticky home footer (Figma 37:1377 plaque **204×91**): **Handcrafted / & made with love**; orange/brown fill + white→transparent gradient stroke; appears after home card intro is **done**; **no** Call / WhatsApp bar
 - No green wave WhatsApp footer on Home
 
 ### Gallery
-- Nav chrome slides in from top; progressive blur 4→0 + black gradient @25%
+- Nav chrome slides in from top; progressive blur **12→0** + black gradient @25%
 - Circular back / share / WhatsApp; truncated white title (`galleryTitle`) **left-aligned** between back and actions
-- Share: brand `og-image.png` **first** in the Web Share file list, then Image 1 (+ any warm extras); copy + category URL. `og:image` meta stays the brand mark (not the cover photo)
+- Share: **product photos only** (all gallery images; no favicon / brand `og-image`); copy + category URL. `og:image` meta stays the brand mark (not the cover photo)
 - Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
-- Nav: back / share / WhatsApp at **48×48**; WhatsApp uses home green gradient + icon; **12px** gap before WhatsApp; opens same category WhatsApp message as footer
-- Tap a photo → lightbox: centered carousel track (neighbors visible while dragging), black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×) with edge-clamped pan; **double-tap toggles ~2.5× ↔ 1×** (works while zoomed too); at 1× swipe L/R changes photo, swipe down or tap dimmed sides to close
-- **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; WhatsApp link; **explicit px height** (`max(72, colW/WAVE_AR)`)
+- Nav: back / share / WhatsApp at **48×48**; icons **1.5px** stroke; WhatsApp uses home green gradient + icon; **12px** gap before WhatsApp; opens same category WhatsApp message as before
+- Tap a photo → lightbox: centered infinite carousel (clones at both ends), black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×) with edge-clamped pan; **double-tap toggles ~2.5× ↔ 1×** (works while zoomed too); at 1× swipe L/R changes photo **and wraps**: last + swipe left → first slides in from the right; first + swipe right → last slides in from the left; swipe down or tap dimmed sides to close
+- **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **gradient stroke** (white → transparent on the rising bump); **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; **not a WhatsApp link**; **explicit px height** (`max(72, colW/WAVE_AR)`)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
 - Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
 - After intro + **0.5s**, rotates the two footer lines
-- Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)` — no solid pad under the CTA
+- Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)`
 
 Navigation: History API + **280ms** fade. Back → `/`.
 
@@ -157,7 +157,7 @@ interface CategoryData {
 | `HomeScreen` / `GalleryScreen` | `App.tsx` | Screens |
 | `BlueHeader` / `GreenFooter` | `App.tsx` | Chrome + `useChromeIntro` |
 | `DriveImg` / cards / blur | `App.tsx` | Media + home cards |
-| `shareCategory` | `lib/share.ts` | Web Share — brand OG first |
+| `shareCategory` | `lib/share.ts` | Web Share — product photos only |
 
 Unused: `src/imports/**`, root `imports/**` (Figma exports — do not wire into the app).
 
@@ -174,7 +174,7 @@ File **Extension - V2** (`PrF1j2l2jxbROee7Ek6PW8`), Page 3 — code-built frames
 | `GalleryScreen` | `GalleryScreen` |
 | `BlueHeader` / `GreenFooter` | chrome components |
 | `CategoryCard` / `cardMedia` / `cardCta` | home cards |
-| `HandcraftedBadge` | end-of-list badge |
+| `HomeFooterBadge` | sticky home Handcrafted plaque |
 | `galleryNav` / `Photo list` / `navScrim` | gallery chrome + list |
 
 When rebuilding or cloning screens, rename layers to these names — do not leave `Frame 1580…` / `Screen N` on the parity frames.

@@ -12,8 +12,8 @@
  *   Design tokens / SVG paths     Header, footer, card frame geometry
  *   useChromeIntro                Shared stroke → fill → (marks) → text
  *   BlueHeader / GreenFooter      Sticky chrome (footer = WAVE_AR shell + h-full, always on gallery)
- *   HomeContactBar                Home-only Call + WhatsApp pills (Figma 7:82)
- *   HomePromoCarousel             Home promo strip (Figma 14:141 / 14:139 / 14:143)
+ *   HomeFooterBadge               End-of-list Handcrafted plaque (Figma 37:1377)
+ *   HomeContactBar                Home Call + WhatsApp pills (52px / 52×52 compact)
  *   RotatingLines                 CTA / footer copy rotator
  *   DriveImg / Card* / PhotoLightbox  Photos, cards, gallery zoom viewer
  *   HomeScreen / GalleryScreen    Screens
@@ -35,10 +35,8 @@ import bgImg from '@/assets/bg.png'
 import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
-import promo01 from '@/assets/promo/promo-01.png'
-import promo02 from '@/assets/promo/promo-02.png'
-import promo03 from '@/assets/promo/promo-03.png'
 import iconSwastik from '@/assets/icons/swastik.svg'
+import waFlower from '@/assets/icons/wa-flower.png'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
@@ -54,6 +52,8 @@ const CHROME_BROWN = '#913C16'
 const FS_HEAD   = 36
 const FS_CHROME = 16
 const NAV_BTN = 48
+const ICON_PX = 24
+const HOME_PILL_H = 52
 
 // ── SVG paths (from Figma Extension V2: 298:141676 / 298:141678) ──
 // Header: flat top, bump hangs down. Footer: flat bottom, bump points up.
@@ -68,22 +68,6 @@ const CARD_FRAME =
   'M338.508 0C338.508 12.228 348.265 22.177 360.419 22.485L361 22.492V338.508C348.578 338.508 338.508 348.578 338.508 361H22.492C22.492 348.578 12.422 338.508 0 338.508V22.492C12.228 22.492 22.176 12.735 22.484 0.581L22.492 0H338.508Z'
 const CARD_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 361 361"><path fill="white" d="${CARD_FRAME}"/></svg>`,
-)}")`
-
-/** Figma promo Subtract 12:114 — landscape 361×203.172 with corner cuts. */
-const PROMO_W = 361
-const PROMO_H = 203.172
-const PROMO_FRAME =
-  'M341 0C341 10.873 349.676 19.7192 360.483 19.9932L361 20V183.172C349.954 183.172 341 192.126 341 203.172H20C20 192.126 11.0457 183.172 0 183.172V20C10.873 20 19.7192 11.3235 19.9932 0.516602L20 0H341Z'
-const PROMO_FRAME_MASK = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROMO_W} ${PROMO_H}"><path fill="white" d="${PROMO_FRAME}"/></svg>`,
-)}")`
-/** Figma caption Subtract — bar + frosted blur under label. */
-const PROMO_CAPTION_H = 45.9067
-const PROMO_CAPTION =
-  'M361 25.8169C349.307 25.8169 341.027 35.6552 341.027 45.9057H20.1757C20.1757 34.4645 10.3652 25.8331 0 25.8331V0H361V25.8169Z'
-const PROMO_CAPTION_MASK = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PROMO_W} ${PROMO_CAPTION_H}"><path fill="white" d="${PROMO_CAPTION}"/></svg>`,
 )}")`
 
 // Half-path strokes: centre peak → outer corner (draw outward L+R simultaneously).
@@ -101,13 +85,13 @@ const WAVE_AR = 393 / 87.3859
 const WA_NUMBER = '918766630191'
 const CALL_NUMBER = '9272517248'
 const HOME_WA_MSG = 'Hey, I am interested in the designs'
-/** Home list bottom inset — reserves Call/WhatsApp bar + gap */
-const HOME_CONTACT_BAR_H = 120
+/** Home list bottom inset — Call/WhatsApp bar (52px pills) + gap */
+const HOME_CONTACT_BAR_H = 124
 /** Home list top inset under absolute header */
 const HOME_SCROLL_PAD_TOP = 120
-/** Wait this long while scrolling before collapsing; same idle before expand */
 const HOME_BAR_SETTLE_MS = 1000
 const HOME_BAR_EASE = '1000ms ease-in-out'
+const HOME_PILL_SHADOW = '0px 4px 16px 0px rgba(0,0,0,0.15)'
 function waUrl(message: string) {
   return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`
 }
@@ -129,22 +113,6 @@ const T_HEADER_INTRO = T_TRACE_DUR + T_FILL_DUR + T_MARK_DUR + T_TEXT_DUR
 /** Slide home cards in when header chrome is ~60% through. */
 const T_CARDS_AT = Math.round(T_HEADER_INTRO * 0.6)
 const T_CARDS_GAP = 900   // after cards start, then enable scroll
-
-/** Home promo strip — Figma 14:139 / 14:143 / 14:141 (361×203.172 Subtract). */
-const PROMO_SLIDES = [
-  { src: promo01, label: 'Ready to Install' },
-  { src: promo02, label: 'Quality Materials Used' },
-  { src: promo03, label: 'Handcrafted with Love' },
-] as const
-const PROMO_GAP = 16
-const PROMO_WIDTH_FRAC = 0.8
-const PROMO_MS = 2800
-const PROMO_EASE_MS = 900
-const PROMO_AR = PROMO_W / PROMO_H
-const PROMO_LABEL_PX = 18
-const PROMO_BLUR_PX = 16
-/** Figma 7:82 drop shadow on Call / WhatsApp pills */
-const HOME_PILL_SHADOW = '0px 4px 16px 0px rgba(0,0,0,0.15)'
 
 // ── Font-ready hook ───────────────────────────────────────────
 function useFontsReady() {
@@ -365,9 +333,13 @@ function BlueHeader({
         <path
           d={HEADER}
           fill="url(#blueHGrad)"
+          stroke="url(#blueHStroke)"
+          strokeWidth={2}
+          vectorEffect="non-scaling-stroke"
           style={{
             fillOpacity: fillOn ? 1 : 0,
-            transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
+            strokeOpacity: fillOn ? 1 : 0,
+            transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out, stroke-opacity ${T_FILL_DUR}ms ease-in-out`,
           }}
         />
         <path d={HEADER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
@@ -375,6 +347,10 @@ function BlueHeader({
         <defs>
           <linearGradient id="blueHGrad" x1="196.5" y1="80.823" x2="196.5" y2="0" gradientUnits="userSpaceOnUse">
             <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
+          </linearGradient>
+          {/* Figma 34:1373 — white highlight on the hanging bump, fades out upward */}
+          <linearGradient id="blueHStroke" x1="196.5" y1="87.3867" x2="196.5" y2="35.3436" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#fff" /><stop offset="1" stopColor="#fff" stopOpacity={0} />
           </linearGradient>
         </defs>
       </svg>
@@ -515,10 +491,9 @@ function RotatingLines({
 
 // ── Green sticky footer ───────────────────────────────────────
 function GreenFooter({
-  label, href, playIntro = false, onIntroComplete, visible = true, rotateActive = true, shellWidth,
+  label, playIntro = false, onIntroComplete, visible = true, rotateActive = true, shellWidth,
 }: {
   label: string | string[]
-  href: string
   playIntro?: boolean
   onIntroComplete?: () => void
   visible?: boolean
@@ -546,8 +521,8 @@ function GreenFooter({
   const fillOn = showFill || locked || settled
 
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer"
-      className="pointer-events-auto block w-full active:opacity-75" aria-label={aria}
+    <div
+      className="pointer-events-none block w-full" aria-label={aria} role="note"
       style={{
         visibility: visible ? 'visible' : 'hidden',
         // Lift wave above home indicator only — no solid pad under the footer
@@ -564,9 +539,13 @@ function GreenFooter({
           <path
             d={FOOTER}
             fill={`url(#${uid}_grad)`}
+            stroke={`url(#${uid}_stroke)`}
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
             style={{
               fillOpacity: fillOn ? 1 : 0,
-              transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out`,
+              strokeOpacity: fillOn ? 1 : 0,
+              transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out, stroke-opacity ${T_FILL_DUR}ms ease-in-out`,
             }}
           />
           <path d={FOOTER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
@@ -574,6 +553,10 @@ function GreenFooter({
           <defs>
             <linearGradient id={`${uid}_grad`} x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
               <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
+            </linearGradient>
+            {/* Figma 35:1374 — white highlight on the rising bump, fades out downward */}
+            <linearGradient id={`${uid}_stroke`} x1="196.5" y1="0" x2="196.5" y2="52.0431" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#fff" /><stop offset="1" stopColor="#fff" stopOpacity={0} />
             </linearGradient>
           </defs>
         </svg>
@@ -599,16 +582,24 @@ function GreenFooter({
           />
         </span>
       </div>
-    </a>
+    </div>
   )
 }
 
-/** Home end badge — Figma 326:261, hardcoded for crisp edges. */
-function HandcraftedBadge() {
+const HOME_BADGE_PATH =
+  'M102.066 90.7594C110.211 75.6331 122.625 78.7644 171.226 84.3472C176.873 84.9958 181.824 80.5803 181.824 74.8964V68.1461C193.399 70.3657 204.132 61.4955 204.132 49.7098V41.0497C204.132 29.264 193.399 20.3938 181.824 22.6134V15.863C181.824 -10.3524 117.801 29.2214 102.066 0C86.403 29.0888 22.3079 -10.3074 22.3079 15.863V22.6134C10.7333 20.3935 0 29.264 0 41.0497V49.7098C0 61.4955 10.7333 70.3657 22.3079 68.1461V74.8964C22.3079 80.5803 27.2595 84.9958 32.9062 84.3472C81.562 78.7584 93.9471 75.6817 102.066 90.7594Z'
+
+/** End-of-list Handcrafted plaque — Figma 37:1377. */
+function HomeFooterBadge({ visible }: { visible: boolean }) {
   return (
     <div
       className="relative w-full flex justify-center"
       aria-label="Handcrafted and made with love"
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(12px)',
+        transition: 'opacity 650ms ease-in-out, transform 650ms ease-in-out',
+      }}
     >
       <div
         className="relative mx-auto"
@@ -626,22 +617,28 @@ function HandcraftedBadge() {
           aria-hidden
         >
           <defs>
-            <linearGradient id="hcBadgeGrad" x1="102.066" y1="0" x2="102.066" y2="90.7594" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#FC9C02" />
-              <stop offset="1" stopColor="#964E01" />
+            <linearGradient id="hcBadgeGrad" x1="102.066" y1="6.81642" x2="102.066" y2="90.7594" gradientUnits="userSpaceOnUse">
+              <stop stopColor={CHROME_ORANGE} />
+              <stop offset="1" stopColor={CHROME_BROWN} />
+            </linearGradient>
+            <linearGradient id="hcBadgeStroke" x1="102.066" y1="0" x2="102.066" y2="54.0522" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#fff" />
+              <stop offset="1" stopColor="#fff" stopOpacity={0} />
             </linearGradient>
             <filter id="hcBadgeInner" x="-4%" y="-8%" width="108%" height="116%" filterUnits="objectBoundingBox">
               <feOffset dy="-2" />
               <feGaussianBlur stdDeviation="4" result="blur" />
               <feComposite in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" />
-              <feColorMatrix values="0 0 0 0 0.507692 0 0 0 0 0.307627 0 0 0 0 0 0 0 0 1 0" />
+              <feColorMatrix values="0 0 0 0 0.423529 0 0 0 0 0.24543 0 0 0 0 0.0564706 0 0 0 1 0" />
               <feBlend in2="SourceGraphic" mode="normal" />
             </filter>
           </defs>
           <path
             filter="url(#hcBadgeInner)"
             fill="url(#hcBadgeGrad)"
-            d="M102.066 90.7594C110.211 75.6331 122.625 78.7644 171.226 84.3472C176.873 84.9958 181.824 80.5803 181.824 74.8964V68.1461C193.399 70.3657 204.132 61.4955 204.132 49.7098V41.0497C204.132 29.264 193.399 20.3938 181.824 22.6134V15.863C181.824 -10.3524 117.801 29.2214 102.066 0C86.403 29.0888 22.3079 -10.3074 22.3079 15.863V22.6134C10.7333 20.3935 0 29.264 0 41.0497V49.7098C0 61.4955 10.7333 70.3657 22.3079 68.1461V74.8964C22.3079 80.5803 27.2595 84.9958 32.9062 84.3472C81.562 78.7584 93.9471 75.6817 102.066 90.7594Z"
+            stroke="url(#hcBadgeStroke)"
+            strokeWidth={2}
+            d={HOME_BADGE_PATH}
           />
         </svg>
         {/* Optical center of the ornate plate (scallops bias visual mass upward) */}
@@ -667,7 +664,7 @@ function HandcraftedBadge() {
 }
 
 function NavIconBtn({
-  label, onClick, src, href, background, insetShadow,
+  label, onClick, src, href, background, insetShadow, flower,
 }: {
   label: string
   onClick?: () => void
@@ -676,24 +673,45 @@ function NavIconBtn({
   href?: string
   background?: string
   insetShadow?: string
+  /** Figma 40:1378 — 8-lobe flower chrome; shape spins, glyph stays upright. */
+  flower?: boolean
 }) {
-  const className = 'relative flex items-center justify-center shrink-0 overflow-hidden active:opacity-75'
+  const className = 'relative flex items-center justify-center shrink-0 active:opacity-75'
   const style: React.CSSProperties = {
     width: NAV_BTN,
     height: NAV_BTN,
-    borderRadius: 62,
-    background: background ?? 'linear-gradient(to top, #000 12.393%, #333)',
+    overflow: flower ? 'visible' : 'hidden',
+    borderRadius: flower ? 0 : 62,
+    background: flower ? 'transparent' : (background ?? 'linear-gradient(to top, #000 12.393%, #333)'),
   }
   const inner = (
     <>
-      {insetShadow && (
+      {flower && (
+        <img
+          src={waFlower}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 size-full"
+          style={{ animation: 'wa-flower-spin 3.2s ease-in-out infinite' }}
+          draggable={false}
+        />
+      )}
+      {!flower && insetShadow && (
         <span
           aria-hidden
           className="absolute inset-0 rounded-[62px]"
           style={{ boxShadow: insetShadow }}
         />
       )}
-      <img src={src} alt="" width={24} height={24} className="relative block size-6" draggable={false} />
+      <img
+        src={src}
+        alt=""
+        width={ICON_PX}
+        height={ICON_PX}
+        className="relative block"
+        style={{ width: ICON_PX, height: ICON_PX }}
+        draggable={false}
+      />
     </>
   )
   if (href) {
@@ -720,6 +738,144 @@ function NavIconBtn({
     >
       {inner}
     </button>
+  )
+}
+
+/** Home-only Call + WhatsApp bar. Height 52; compact circles are 52×52. */
+function HomeContactBar({ compact, visible }: { compact: boolean; visible: boolean }) {
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef(0)
+
+  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), 1800)
+  }
+
+  const onCall = async () => {
+    try {
+      await navigator.clipboard?.writeText(CALL_NUMBER)
+    } catch {
+      // clipboard may be denied; still open dialer
+    }
+    showToast('Number copied')
+    window.setTimeout(() => {
+      window.location.href = `tel:+91${CALL_NUMBER}`
+    }, 180)
+  }
+
+  const ease = HOME_BAR_EASE
+  const pillStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    overflow: 'hidden',
+    height: HOME_PILL_H,
+    width: compact ? HOME_PILL_H : undefined,
+    flex: compact ? `0 0 ${HOME_PILL_H}px` : '1 1 0%',
+    gap: compact ? 0 : 4,
+    padding: compact ? 0 : '0 16px',
+    borderRadius: 40,
+    boxShadow: HOME_PILL_SHADOW,
+    transition: `flex ${ease}, width ${ease}, padding ${ease}, gap ${ease}, box-shadow ${ease}`,
+  }
+  const labelStyle: React.CSSProperties = {
+    fontFamily: FONT_BOLD,
+    fontSize: 16,
+    letterSpacing: -0.16,
+    color: '#fff',
+    lineHeight: 'normal',
+    whiteSpace: 'nowrap',
+    maxWidth: compact ? 0 : 160,
+    opacity: compact ? 0 : 1,
+    overflow: 'hidden',
+    transition: `max-width ${ease}, opacity ${ease}`,
+  }
+  const iconBox: React.CSSProperties = {
+    width: ICON_PX,
+    height: ICON_PX,
+    padding: 0,
+    flexShrink: 0,
+  }
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(12px)',
+        transition: `opacity ${ease}, transform ${ease}`,
+        pointerEvents: visible ? undefined : 'none',
+      }}
+      aria-hidden={!visible}
+    >
+      <div
+        className="pointer-events-auto relative flex w-full flex-row items-center justify-between gap-6 px-4 py-6"
+        data-name="Bottom Bar"
+        style={{ pointerEvents: visible ? 'auto' : 'none' }}
+      >
+        {toast && (
+          <div
+            className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-full px-3 py-1.5 text-[13px] text-white"
+            style={{
+              bottom: 'calc(100% - 8px)',
+              background: 'rgba(0,0,0,0.78)',
+              fontFamily: FONT_SEMI,
+            }}
+            role="status"
+          >
+            {toast}
+          </div>
+        )}
+        <button type="button" style={pillStyle} onClick={onCall} aria-label={`Call ${CALL_NUMBER}`}>
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ background: 'linear-gradient(to bottom, #0e62ec, #0b4ebc)' }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ boxShadow: 'inset 0px -2px 8px 0px #3a80f3' }}
+          />
+          <span className="relative shrink-0 overflow-hidden" style={iconBox}>
+            <img src="/icons/icon-phone.svg" alt="" className="block size-full" width={ICON_PX} height={ICON_PX} />
+          </span>
+          <span className="relative" style={labelStyle} aria-hidden={compact}>
+            {CALL_NUMBER}
+          </span>
+        </button>
+        <a
+          style={pillStyle}
+          href={waUrl(HOME_WA_MSG)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`WhatsApp ${WA_NUMBER.slice(2)}`}
+        >
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ background: 'linear-gradient(to bottom, #25d366, #1ea952)' }}
+          />
+          <span
+            aria-hidden
+            className="absolute inset-0 rounded-[40px]"
+            style={{ boxShadow: 'inset 0px -2px 8px 0px rgba(77,224,132,0.5)' }}
+          />
+          <span className="relative shrink-0 overflow-hidden" style={iconBox}>
+            <img src="/icons/icon-whatsapp.svg" alt="" className="block size-full" width={ICON_PX} height={ICON_PX} />
+          </span>
+          <span className="relative" style={labelStyle} aria-hidden={compact}>
+            {WA_NUMBER.slice(2)}
+          </span>
+        </a>
+      </div>
+    </div>
   )
 }
 
@@ -1199,320 +1355,6 @@ function CategoryCard({
   )
 }
 
-/** Home-only Call + WhatsApp bar — Figma 7:82. Collapses to 48×48 icons while scrolling. */
-function HomeContactBar({ compact, visible }: { compact: boolean; visible: boolean }) {
-  const [toast, setToast] = useState<string | null>(null)
-  const toastTimer = useRef(0)
-
-  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
-
-  const showToast = (msg: string) => {
-    setToast(msg)
-    window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setToast(null), 1800)
-  }
-
-  const onCall = async () => {
-    try {
-      await navigator.clipboard?.writeText(CALL_NUMBER)
-    } catch {
-      // clipboard may be denied; still open dialer
-    }
-    showToast('Number copied')
-    // Brief beat so the toast paints before the dialer steals focus
-    window.setTimeout(() => {
-      window.location.href = `tel:+91${CALL_NUMBER}`
-    }, 180)
-  }
-
-  const ease = HOME_BAR_EASE
-  // Pills stay content-centered; icon left, number right. Outer bar uses space-between when compact.
-  const pillStyle: React.CSSProperties = {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    overflow: 'hidden',
-    height: 48,
-    width: compact ? 48 : undefined,
-    flex: compact ? '0 0 48px' : '1 1 0%',
-    gap: compact ? 0 : 4,
-    padding: compact ? 0 : '0 16px',
-    borderRadius: 40,
-    boxShadow: HOME_PILL_SHADOW,
-    transition: `flex ${ease}, width ${ease}, padding ${ease}, gap ${ease}, box-shadow ${ease}`,
-  }
-  const labelStyle: React.CSSProperties = {
-    fontFamily: FONT_BOLD,
-    fontSize: 16,
-    letterSpacing: -0.16,
-    color: '#fff',
-    lineHeight: 'normal',
-    whiteSpace: 'nowrap',
-    maxWidth: compact ? 0 : 160,
-    opacity: compact ? 0 : 1,
-    overflow: 'hidden',
-    transition: `max-width ${ease}, opacity ${ease}`,
-  }
-  const iconBox: React.CSSProperties = compact
-    ? { width: 48, height: 48, padding: 12 }
-    : { width: 24, height: 24, padding: 0 }
-
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-40"
-      style={{
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(12px)',
-        transition: `opacity ${ease}, transform ${ease}`,
-        pointerEvents: visible ? undefined : 'none',
-      }}
-      aria-hidden={!visible}
-    >
-      <div
-        className="pointer-events-auto relative flex w-full flex-row items-center justify-between gap-6 px-4 py-6"
-        data-name="Bottom Bar"
-        style={{ pointerEvents: visible ? 'auto' : 'none' }}
-      >
-        {toast && (
-          <div
-            className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 rounded-full px-3 py-1.5 text-[13px] text-white"
-            style={{
-              bottom: 'calc(100% - 8px)',
-              background: 'rgba(0,0,0,0.78)',
-              fontFamily: FONT_SEMI,
-            }}
-            role="status"
-          >
-            {toast}
-          </div>
-        )}
-        <button type="button" style={pillStyle} onClick={onCall} aria-label={`Call ${CALL_NUMBER}`}>
-          <span
-            aria-hidden
-            className="absolute inset-0 rounded-[40px]"
-            style={{ background: 'linear-gradient(to bottom, #0e62ec, #0b4ebc)' }}
-          />
-          <span
-            aria-hidden
-            className="absolute inset-0 rounded-[40px]"
-            style={{ boxShadow: 'inset 0px -2px 8px 0px #3a80f3' }}
-          />
-          <span
-            className="relative shrink-0 overflow-hidden"
-            style={{
-              ...iconBox,
-              boxSizing: 'border-box',
-              transition: `width ${ease}, height ${ease}, padding ${ease}`,
-            }}
-          >
-            <img src="/icons/icon-phone.svg" alt="" className="block size-full" width={24} height={24} />
-          </span>
-          <span className="relative" style={labelStyle} aria-hidden={compact}>
-            {CALL_NUMBER}
-          </span>
-        </button>
-        <a
-          style={pillStyle}
-          href={waUrl(HOME_WA_MSG)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`WhatsApp ${WA_NUMBER.slice(2)}`}
-        >
-          <span
-            aria-hidden
-            className="absolute inset-0 rounded-[40px]"
-            style={{ background: 'linear-gradient(to bottom, #25d366, #1ea952)' }}
-          />
-          <span
-            aria-hidden
-            className="absolute inset-0 rounded-[40px]"
-            style={{ boxShadow: 'inset 0px -2px 8px 0px rgba(77,224,132,0.5)' }}
-          />
-          <span
-            className="relative shrink-0 overflow-hidden"
-            style={{
-              ...iconBox,
-              boxSizing: 'border-box',
-              transition: `width ${ease}, height ${ease}, padding ${ease}`,
-            }}
-          >
-            <img src="/icons/icon-whatsapp.svg" alt="" className="block size-full" width={24} height={24} />
-          </span>
-          <span className="relative" style={labelStyle} aria-hidden={compact}>
-            {WA_NUMBER.slice(2)}
-          </span>
-        </a>
-      </div>
-    </div>
-  )
-}
-
-/** Non-interactive home promo — Figma Subtract; full-bleed; 80% center; 16px gap; slow ease. */
-function HomePromoCarousel({ visible, delay }: { visible: boolean; delay: number }) {
-  const n = PROMO_SLIDES.length
-  const track = useMemo(() => [...PROMO_SLIDES, ...PROMO_SLIDES, ...PROMO_SLIDES], [])
-  const rootRef = useRef<HTMLDivElement>(null)
-  // Start in the middle copy so left + right neighbors always exist
-  const [i, setI] = useState<number>(n)
-  const [anim, setAnim] = useState(true)
-  const [boxW, setBoxW] = useState(0)
-
-  useLayoutEffect(() => {
-    const el = rootRef.current
-    if (!el) return
-    const measure = () => setBoxW(el.clientWidth)
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (!visible) return
-    const t = window.setInterval(() => {
-      setAnim(true)
-      setI((v) => v + 1)
-    }, PROMO_MS)
-    return () => window.clearInterval(t)
-  }, [visible])
-
-  const onTrackEnd = () => {
-    // After sliding into the third copy, snap back one set — same visual, no reverse
-    if (i < n * 2) return
-    setAnim(false)
-    setI((v) => v - n)
-  }
-
-  const slideW = boxW > 0 ? boxW * PROMO_WIDTH_FRAC : 0
-  const slideH = slideW > 0 ? slideW * (PROMO_H / PROMO_W) : 0
-  const step = slideW + PROMO_GAP
-  const tx = slideW > 0 ? (boxW - slideW) / 2 - i * step : 0
-  const moveEase = anim && slideW > 0 ? `transform ${PROMO_EASE_MS}ms ease-in-out` : 'none'
-  const slideEase = anim
-    ? `transform ${PROMO_EASE_MS}ms ease-in-out, opacity ${PROMO_EASE_MS}ms ease-in-out`
-    : 'none'
-  const captionH = slideH > 0 ? slideH * (PROMO_CAPTION_H / PROMO_H) : undefined
-
-  return (
-    <div
-      ref={rootRef}
-      className="relative w-full overflow-hidden pointer-events-none"
-      aria-hidden
-      style={{
-        height: slideH || undefined,
-        aspectRatio: slideH ? undefined : `${PROMO_AR}`,
-        opacity: visible ? 1 : 0,
-        transform: visible ? 'translateY(0)' : 'translateY(52px)',
-        transition: `opacity 650ms ease-in-out ${delay}ms, transform 650ms ease-in-out ${delay}ms`,
-      }}
-    >
-      <div
-        className="absolute inset-y-0 left-0 flex items-center"
-        onTransitionEnd={(e) => {
-          if (e.target !== e.currentTarget) return
-          if (e.propertyName !== 'transform') return
-          onTrackEnd()
-        }}
-        style={{
-          gap: PROMO_GAP,
-          transform: `translateX(${tx}px)`,
-          transition: moveEase,
-          willChange: 'transform',
-        }}
-      >
-        {track.map((slide, idx) => {
-          const active = idx === i
-          return (
-            <div
-              key={idx}
-              className="relative shrink-0 overflow-hidden"
-              style={{
-                width: slideW || `${PROMO_WIDTH_FRAC * 100}%`,
-                height: slideH || '100%',
-                WebkitMaskImage: PROMO_FRAME_MASK,
-                maskImage: PROMO_FRAME_MASK,
-                WebkitMaskSize: '100% 100%',
-                maskSize: '100% 100%',
-                WebkitMaskRepeat: 'no-repeat',
-                maskRepeat: 'no-repeat',
-                transform: `scale(${active ? 0.9 : 0.8})`,
-                opacity: 1,
-                transition: slideEase,
-              }}
-            >
-              <img
-                src={slide.src}
-                alt=""
-                draggable={false}
-                className="absolute inset-0 size-full object-cover object-center block"
-                style={{ maxWidth: 'none' }}
-              />
-              {/* Caption bar — shape mask; blur 12→0 bottom→top */}
-              <div
-                className="absolute inset-x-0 bottom-0 flex items-center justify-center"
-                style={{ height: captionH ?? `${(PROMO_CAPTION_H / PROMO_H) * 100}%` }}
-              >
-                <div
-                  aria-hidden
-                  className="absolute inset-0 overflow-hidden"
-                  style={{
-                    WebkitMaskImage: PROMO_CAPTION_MASK,
-                    maskImage: PROMO_CAPTION_MASK,
-                    WebkitMaskSize: '100% 100%',
-                    maskSize: '100% 100%',
-                    WebkitMaskRepeat: 'no-repeat',
-                    maskRepeat: 'no-repeat',
-                  }}
-                >
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backdropFilter: `blur(${PROMO_BLUR_PX}px)`,
-                      WebkitBackdropFilter: `blur(${PROMO_BLUR_PX}px)`,
-                      maskImage: 'linear-gradient(to top, #000 0%, transparent 100%)',
-                      WebkitMaskImage: 'linear-gradient(to top, #000 0%, transparent 100%)',
-                    }}
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      backdropFilter: `blur(${PROMO_BLUR_PX / 2}px)`,
-                      WebkitBackdropFilter: `blur(${PROMO_BLUR_PX / 2}px)`,
-                      maskImage: 'linear-gradient(to top, transparent 0%, #000 40%, transparent 85%)',
-                      WebkitMaskImage: 'linear-gradient(to top, transparent 0%, #000 40%, transparent 85%)',
-                    }}
-                  />
-                  <div
-                    className="absolute inset-0"
-                    style={{
-                      background:
-                        'linear-gradient(to top, rgba(102,73,48,0.25), rgba(184,118,64,0.25))',
-                    }}
-                  />
-                </div>
-                <p
-                  className="relative m-0 text-center text-white whitespace-nowrap"
-                  style={{
-                    fontFamily: FONT_BOLD,
-                    fontSize: PROMO_LABEL_PX,
-                    letterSpacing: -0.16,
-                    lineHeight: 'normal',
-                  }}
-                >
-                  {slide.label}
-                </p>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 // ── Screen 1 ─────────────────────────────────────────────────
 interface HomeScreenProps {
   categories: CategoryData[]
@@ -1610,7 +1452,6 @@ function HomeScreen({
           const y = e.currentTarget.scrollTop
           setScrolled(y > 8)
           onScrollTopChange?.(y)
-          // 1s of scroll activity → compact; 1s idle → expand (both ease slowly)
           window.clearTimeout(barExpandTimer.current)
           if (!barCompactTimer.current) {
             barCompactTimer.current = window.setTimeout(() => {
@@ -1625,23 +1466,19 @@ function HomeScreen({
           }, HOME_BAR_SETTLE_MS)
         }}
       >
-        <div className="flex flex-col gap-10 items-center pt-4">
-          {/* Full-bleed promo — outside the 16px card padding so edges aren't cropped */}
-          <HomePromoCarousel visible={cardsVisible} delay={0} />
-          <div className="flex w-full flex-col gap-10 items-center px-4">
-            {categories.map((cat, i) => (
-              <CategoryCard
-                key={cat.id}
-                category={cat}
-                onViewAll={() => onViewAll(cat)}
-                introVisible={cardsVisible}
-                introDelay={(i + 1) * 180}
-                scrollerRef={scrollerRef}
-                scrollActive={scrollable}
-              />
-            ))}
-            <HandcraftedBadge />
-          </div>
+        <div className="flex w-full flex-col gap-10 items-center px-4 pt-4">
+          {categories.map((cat, i) => (
+            <CategoryCard
+              key={cat.id}
+              category={cat}
+              onViewAll={() => onViewAll(cat)}
+              introVisible={cardsVisible}
+              introDelay={(i + 1) * 180}
+              scrollerRef={scrollerRef}
+              scrollActive={scrollable}
+            />
+          ))}
+          <HomeFooterBadge visible={cardsVisible} />
         </div>
       </div>
 
@@ -1675,6 +1512,26 @@ function clampPan(scale: number, tx: number, ty: number, size: number) {
   }
 }
 
+/** Infinite track: [last, ...photos, first]. Real index from track slot. */
+function lbRealIndex(n: number, trackI: number) {
+  if (n <= 1) return 0
+  return ((trackI - 1) % n + n) % n
+}
+function lbStartTrack(n: number, index: number) {
+  return n > 1 ? index + 1 : 0
+}
+function lbSnapTrack(n: number, trackI: number) {
+  if (n <= 1) return trackI
+  if (trackI === 0) return n
+  if (trackI === n + 1) return 1
+  return trackI
+}
+{
+  const a = lbRealIndex(3, 0) === 2 && lbRealIndex(3, 1) === 0 && lbRealIndex(3, 4) === 0
+  const b = lbSnapTrack(3, 0) === 3 && lbSnapTrack(3, 4) === 1 && lbSnapTrack(3, 2) === 2
+  if (!a || !b) throw new Error('lightbox wrap check failed')
+}
+
 function PhotoLightbox({
   photos, index, alt, onClose,
 }: {
@@ -1684,7 +1541,15 @@ function PhotoLightbox({
   onClose: () => void
 }) {
   const n = photos.length
-  const [i, setI] = useState(index)
+  const looped = n > 1
+  const slides = useMemo(
+    () => (looped ? [photos[n - 1], ...photos, photos[0]] : photos),
+    [photos, n, looped],
+  )
+  const slideN = slides.length
+  const [trackI, setTrackI] = useState(() => lbStartTrack(n, index))
+  const [noEase, setNoEase] = useState(false)
+  const i = lbRealIndex(n, trackI)
   const [scale, setScale] = useState(1)
   const [tx, setTx] = useState(0)
   const [ty, setTy] = useState(0)
@@ -1746,7 +1611,23 @@ function PhotoLightbox({
 
   useEffect(() => {
     resetZoom()
-  }, [i, resetZoom])
+  }, [trackI, resetZoom])
+
+  const onTrackEnd = () => {
+    if (!looped) return
+    const snapped = lbSnapTrack(n, trackI)
+    if (snapped === trackI) return
+    setNoEase(true)
+    setTrackI(snapped)
+  }
+
+  useLayoutEffect(() => {
+    if (!noEase) return
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => setNoEase(false))
+    })
+    return () => cancelAnimationFrame(id)
+  }, [noEase])
 
   const requestClose = useCallback(() => {
     if (leaving) return
@@ -1758,10 +1639,12 @@ function PhotoLightbox({
 
   const go = useCallback((dir: number) => {
     if (n <= 1 || leaving || scale > 1.05) return
-    setI((v) => (v + dir + n) % n)
+    if (looped && (trackI === 0 || trackI === n + 1)) return
+    setNoEase(false)
+    setTrackI((v) => v + dir)
     setDragX(0)
     setDragY(0)
-  }, [n, leaving, scale])
+  }, [n, leaving, scale, looped, trackI])
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -1916,7 +1799,7 @@ function PhotoLightbox({
   const focusEase = leaving
     ? `transform ${LB_OUT_MS}ms ${LB_BOUNCE}, opacity ${LB_OUT_MS}ms ease-in-out`
     : `transform ${LB_IN_MS}ms ${LB_BOUNCE}, opacity ${LB_IN_MS}ms ease-in-out`
-  const trackEase = gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`
+  const trackEase = gesturing || noEase ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`
 
   return (
     <div
@@ -1963,34 +1846,39 @@ function PhotoLightbox({
         >
           <div
             className="absolute inset-y-0 left-0 flex h-full"
+            onTransitionEnd={(e) => {
+              if (e.target !== e.currentTarget) return
+              if (e.propertyName !== 'transform') return
+              onTrackEnd()
+            }}
             style={{
-              width: `${n * 100}%`,
-              transform: `translateX(calc(-${i * (100 / n)}% + ${zoomed ? 0 : dragX}px))`,
+              width: `${slideN * 100}%`,
+              transform: `translateX(calc(-${trackI * (100 / slideN)}% + ${zoomed ? 0 : dragX}px))`,
               transition: trackEase,
               willChange: 'transform',
             }}
           >
-            {photos.map((photo, idx) => (
+            {slides.map((photo, idx) => (
               <div
-                key={photo.id}
+                key={`${photo.id}-${idx}`}
                 className="relative h-full shrink-0 grow-0 overflow-hidden"
-                style={{ flexBasis: `${100 / n}%`, width: `${100 / n}%` }}
+                style={{ flexBasis: `${100 / slideN}%`, width: `${100 / slideN}%` }}
               >
                 <div
                   className="absolute inset-0"
                   style={{
-                    transform: idx === i
+                    transform: idx === trackI
                       ? `translate(${tx}px, ${ty}px) scale(${scale})`
                       : 'none',
                     transition: gesturing ? 'none' : `transform ${LB_SLIDE_MS}ms ${LB_SLIDE_EASE}`,
                     transformOrigin: 'center center',
-                    willChange: idx === i ? 'transform' : undefined,
+                    willChange: idx === trackI ? 'transform' : undefined,
                   }}
                 >
                   <DriveImg
                     src={photo.full}
-                    alt={`${alt} photo ${idx + 1}`}
-                    priority={Math.abs(idx - i) <= 1}
+                    alt={`${alt} photo ${lbRealIndex(n, idx) + 1}`}
+                    priority={Math.abs(idx - trackI) <= 1}
                     className="absolute inset-0 size-full object-contain object-center block"
                     style={{ maxWidth: 'none' }}
                   />
@@ -2068,13 +1956,13 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
           transition: `transform ${GALLERY_NAV_MS}ms ease-in-out, opacity ${GALLERY_NAV_MS}ms ease-in-out`,
         }}
       >
-        {/* Progressive blur 4→0 + black gradient @ 25% overall */}
+        {/* Progressive blur 12→0 + black gradient @ 25% overall */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
           <div
             className="absolute inset-0"
             style={{
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
               maskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
               WebkitMaskImage: 'linear-gradient(to bottom, #000 0%, transparent 55%)',
             }}
@@ -2082,8 +1970,8 @@ function GalleryNavChrome({ children, visible }: { children: React.ReactNode; vi
           <div
             className="absolute inset-0"
             style={{
-              backdropFilter: 'blur(2px)',
-              WebkitBackdropFilter: 'blur(2px)',
+              backdropFilter: 'blur(6px)',
+              WebkitBackdropFilter: 'blur(6px)',
               maskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
               WebkitMaskImage: 'linear-gradient(to bottom, transparent 15%, #000 35%, transparent 75%)',
             }}
@@ -2214,6 +2102,7 @@ function GalleryScreen({ category, onBack, shellWidth }: {
             href={waUrl(waCategoryMsg(category.galleryTitle))}
             background="linear-gradient(to bottom, #25d366, #1ea952)"
             insetShadow="inset 0px -2px 8px 0px rgba(77,224,132,0.5)"
+            flower
           />
         </div>
       </GalleryNavChrome>
@@ -2258,14 +2147,13 @@ function GalleryScreen({ category, onBack, shellWidth }: {
           justifyContent: 'center',
         }}
       >
-        <div className="pointer-events-auto w-full max-w-[480px]">
+        <div className="pointer-events-none w-full max-w-[480px]">
           <GreenFooter
             key={category.id}
             label={[
               'Customization also available',
               'Prices starting from ₹499',
             ]}
-            href={waUrl(waCategoryMsg(category.galleryTitle))}
             playIntro
             onIntroComplete={() => setFooterReady(true)}
             rotateActive={rotateReady}
