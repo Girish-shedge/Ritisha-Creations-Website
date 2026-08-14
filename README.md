@@ -16,6 +16,7 @@ Read in this order:
 3. **`src/App.tsx`** — all screens/UI (file opens with a section map)  
 4. **`src/ShlokaIntro.tsx`** — boot shloka animation only  
 5. **`src/data/driveCatalogue.ts`** + **`api/catalogue.js`** — how categories/photos are loaded  
+6. **`docs/try-in-space.md`** — future “try this design in your room” plan (not built)  
 
 You do **not** need `src/imports/` or root `imports/` — those are raw Figma dumps, unused by the app.
 
@@ -84,17 +85,19 @@ Vercel often auto-aliases the old one-t domain (`ritishacreations.vercel.app`). 
 ```
 src/
   main.tsx              Entry — CSS + mount App
-  App.tsx               Entire UI (home, gallery, chrome, cards)
+  App.tsx               Entire UI (home, gallery, chrome, cards, flower curtain)
   ShlokaIntro.tsx       Boot animation (borders → plaque → Om → shloka → exit)
-  index.css             Tailwind + fonts
+  index.css             Tailwind + fonts + curtain / WA-flower keyframes
   data/
     categories.ts       Types + localStorage catalogue cache
     driveCatalogue.ts   Fetch/normalize Drive → CategoryData[]
   lib/share.ts          Web Share (brand og-image first) + Image 1 prefetch
-  assets/               bg, placeholder, intro art, icons
+  assets/               bg, placeholder, intro art, icons, flowers (1024px marigolds)
 api/
   catalogue.js          Vercel serverless — lists Drive (Referer-safe)
   media.js              Image proxy fallback for share / stubborn files
+docs/
+  try-in-space.md       Future camera → AI composite feature (not shipped)
 public/
   favicon.ico           Multi-size 16/32/48 (Windows + legacy)
   favicon.png           32×32 convenience

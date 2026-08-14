@@ -3,11 +3,12 @@
 This repo is a **Figma Make** Vite app that ships the **Rittisha Creations** site.
 
 **Product docs first:** `README.md` (onboarding + folder map + deploy alias) → `Project.md` (behaviour + mobile do-not-regress).  
+**Future feature (not built):** `docs/try-in-space.md` — camera + rank + 3 composites.  
 **UI entry:** `src/App.tsx` (section map in the file header) → `src/ShlokaIntro.tsx`.
 
 **Live:** https://rittishacreations.vercel.app (two t’s). After every prod deploy, alias that host — Vercel often points the old one-t domain instead.
 
-**Do not regress (see `Project.md`):** gallery green footer always visible with intro + rotating DM/Customization copy; card blur clipped to corner cuts; shloka both borders + per-letter glow/shadow (host filter for iOS).
+**Do not regress (see `Project.md`):** gallery green footer always visible with intro + rotating copy; card blur clipped to corner cuts; shloka both borders + per-letter glow/shadow; flower curtain scale+fade in/out (1024px marigolds).
 
 **Brand / share:** favicon + OG from `scripts/assets/brand-icon-source.png` (`pnpm icons`). Share sheet and `og:image` use brand `icons/og-image.png`, not Drive Image 1. Card titles: `titleLines` keeps product name + puts trailing `[size]` on its own line. Catalogue cache key `ritisha.driveCatalogue.v5`.
 

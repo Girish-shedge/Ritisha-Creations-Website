@@ -89,7 +89,13 @@ body,
   }
 }
 
-@keyframes flower-fade {
-  from { opacity: 1; }
-  to { opacity: 0; }
+@keyframes flower-out {
+  from {
+    opacity: 1;
+    transform: scale(var(--sc, 1)) rotate(var(--rot, 0deg));
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.12) rotate(var(--rot, 0deg));
+  }
 }

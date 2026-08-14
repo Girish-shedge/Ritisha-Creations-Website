@@ -19,6 +19,7 @@
 
 # Ship tiny critical assets as normal git blobs (Vercel often skips LFS pointers)
 src/assets/placeholder.png filter= diff= merge= -text
+src/assets/flowers/*.png filter= diff= merge= -text
 public/audio/**        filter= diff= merge= -text
 
 # ---------------------------------------------------------------------------

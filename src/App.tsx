@@ -37,7 +37,6 @@ import placeholderImg from '@/assets/placeholder.png'
 import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
 import iconSwastik from '@/assets/icons/swastik.svg'
-import waFlower from '@/assets/icons/wa-flower.png'
 import flowerYellow from '@/assets/flowers/flower-1.png'
 import flowerOrange from '@/assets/flowers/flower-2.png'
 
@@ -685,6 +684,61 @@ function HomeFooterBadge({ visible }: { visible: boolean }) {
   )
 }
 
+function WaFlowerChrome() {
+  const uid = useId().replace(/:/g, '')
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      className="absolute inset-0 size-full"
+      aria-hidden
+      style={{ animation: 'wa-flower-spin 3.2s ease-in-out infinite' }}
+    >
+      <defs>
+        <linearGradient id={`${uid}_g`} x1="20.017" y1="0" x2="20.017" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#25D366" />
+          <stop offset="1" stopColor="#1EA952" />
+        </linearGradient>
+        <filter id={`${uid}_s`} x="-10%" y="-15%" width="120%" height="140%" colorInterpolationFilters="sRGB">
+          <feFlood floodOpacity="0" result="bg" />
+          <feBlend in="SourceGraphic" in2="bg" result="shape" />
+          <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+          <feOffset dy="-2" />
+          <feGaussianBlur stdDeviation="4" />
+          <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1" />
+          <feColorMatrix type="matrix" values="0 0 0 0 0.302 0 0 0 0 0.878 0 0 0 0 0.517 0 0 0 0.5 0" />
+          <feBlend mode="normal" in2="shape" />
+        </filter>
+      </defs>
+      <path
+        fill={`url(#${uid}_g)`}
+        filter={`url(#${uid}_s)`}
+        d="M14.8623 0C16.6838 1.28443e-05 18.4318 0.718813 19.7256 2.00098C19.8763 2.15164 20.1211 2.15191 20.2715 2.00098C21.5765 0.740342 23.3203 0.0361535 25.1348 0.0361328C26.9493 0.0361328 28.693 0.740374 29.998 2.00098C31.2242 3.27651 31.9364 4.96026 31.998 6.72852C32.0164 7.0193 31.9897 7.31118 31.9187 7.59359C31.9113 7.62282 31.909 7.65328 31.9101 7.68341C31.9166 7.87593 32.0477 8.0918 32.2403 8.0918H32.2715C33.3084 7.94904 34.3644 8.04697 35.3574 8.37793C36.3505 8.70895 37.2541 9.26457 37.998 10.001C39.2804 11.2948 40 13.0435 40 14.8652C39.9999 16.6868 39.2804 18.4347 37.998 19.7285C37.8476 19.879 37.8476 20.123 37.998 20.2734C38.6354 20.9029 39.1409 21.6541 39.4844 22.4814C39.8277 23.3087 40.0022 24.1961 39.998 25.0918C39.9938 26.0613 39.7826 27.0189 39.3789 27.9004C38.9752 28.7819 38.3885 29.5675 37.6572 30.2041C36.926 30.8407 36.0673 31.3143 35.1387 31.5928C34.21 31.8712 33.2323 31.9486 32.2715 31.8193H32.2404C32.0478 31.8193 31.9165 32.0353 31.91 32.2278C31.909 32.2579 31.9113 32.2883 31.9187 32.3175C31.9897 32.5999 32.0164 32.8919 31.998 33.1826C31.9589 34.9826 31.2451 36.7024 29.998 38.001C28.693 39.2617 26.9494 39.9668 25.1348 39.9668C23.3202 39.9668 21.5766 39.2617 20.2715 38.001C20.1209 37.8504 19.8764 37.8507 19.7256 38.001C19.0961 38.6383 18.3459 39.1439 17.5186 39.4873C16.6912 39.8307 15.803 40.0052 14.9072 40.001C13.9475 40.0064 12.9974 39.8089 12.1191 39.4219C11.2407 39.0347 10.4532 38.4662 9.80957 37.7539C9.16609 37.0417 8.68022 36.201 8.38379 35.2881C8.09014 34.3835 7.98929 33.4271 8.08709 32.4813C8.08889 32.4638 8.08891 32.4462 8.08791 32.4287C8.07644 32.2277 7.93881 32.001 7.73748 32.001H6.81738C5.01747 31.9618 3.29759 31.2479 1.99902 30.001C0.738221 28.6959 0.0332606 26.9523 0.0332031 25.1377C0.0332031 23.323 0.73817 21.5786 1.99902 20.2734C2.1495 20.123 2.1495 19.879 1.99902 19.7285C0.738251 18.4235 0.0332937 16.6798 0.0332031 14.8652C0.0332031 13.0505 0.73817 11.3061 1.99902 10.001C3.32504 8.82032 5.04194 8.17319 6.81738 8.18359H7.74044C7.94042 8.18359 8.07714 7.95854 8.08768 7.75883C8.08874 7.73876 8.08844 7.71846 8.08578 7.69853C7.94893 6.67116 8.04818 5.6261 8.37598 4.64258C8.70704 3.64939 9.26247 2.74496 9.99902 2.00098C11.2929 0.718833 13.0408 0 14.8623 0Z"
+      />
+    </svg>
+  )
+}
+
+function WhatsAppGlyph({ size = ICON_PX }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className="relative block"
+      aria-hidden
+    >
+      <path
+        d="M9 10C9 10.1326 9.05268 10.2598 9.14645 10.3536C9.24021 10.4473 9.36739 10.5 9.5 10.5C9.63261 10.5 9.75979 10.4473 9.85355 10.3536C9.94732 10.2598 10 10.1326 10 10V9C10 8.86739 9.94732 8.74021 9.85355 8.64645C9.75979 8.55268 9.63261 8.5 9.5 8.5C9.36739 8.5 9.24021 8.55268 9.14645 8.64645C9.05268 8.74021 9 8.86739 9 9V10ZM9 10C9 11.3261 9.52678 12.5979 10.4645 13.5355C11.4021 14.4732 12.6739 15 14 15M14 15H15C15.1326 15 15.2598 14.9473 15.3536 14.8536C15.4473 14.7598 15.5 14.6326 15.5 14.5C15.5 14.3674 15.4473 14.2402 15.3536 14.1464C15.2598 14.0527 15.1326 14 15 14H14C13.8674 14 13.7402 14.0527 13.6464 14.1464C13.5527 14.2402 13.5 14.3674 13.5 14.5C13.5 14.6326 13.5527 14.7598 13.6464 14.8536C13.7402 14.9473 13.8674 15 14 15ZM3 20.9988L4.65 17.1988C3.38766 15.4068 2.82267 13.2158 3.06104 11.0369C3.29942 8.85793 4.32479 6.84089 5.94471 5.36427C7.56463 3.88765 9.66775 3.05296 11.8594 3.01685C14.051 2.98073 16.1805 3.74568 17.8482 5.16812C19.5159 6.59057 20.6071 8.57273 20.9172 10.7426C21.2272 12.9125 20.7347 15.121 19.5321 16.9535C18.3295 18.7861 16.4994 20.1168 14.3854 20.6959C12.2713 21.2749 10.0186 21.0626 8.05 20.0988L3 20.9988Z"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function NavIconBtn({
   label, onClick, src, href, background, insetShadow, flower,
 }: {
@@ -708,16 +762,7 @@ function NavIconBtn({
   }
   const inner = (
     <>
-      {flower && (
-        <img
-          src={waFlower}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 size-full"
-          style={{ animation: 'wa-flower-spin 3.2s ease-in-out infinite' }}
-          draggable={false}
-        />
-      )}
+      {flower && <WaFlowerChrome />}
       {!flower && insetShadow && (
         <span
           aria-hidden
@@ -725,15 +770,19 @@ function NavIconBtn({
           style={{ boxShadow: insetShadow }}
         />
       )}
-      <img
-        src={src}
-        alt=""
-        width={ICON_PX}
-        height={ICON_PX}
-        className="relative block"
-        style={{ width: ICON_PX, height: ICON_PX }}
-        draggable={false}
-      />
+      {flower ? (
+        <WhatsAppGlyph />
+      ) : (
+        <img
+          src={src}
+          alt=""
+          width={ICON_PX}
+          height={ICON_PX}
+          className="relative block"
+          style={{ width: ICON_PX, height: ICON_PX }}
+          draggable={false}
+        />
+      )}
     </>
   )
   if (href) {
@@ -2286,7 +2335,7 @@ function FlowerCurtain({
               transform: `scale(${cell.sc}) rotate(${cell.rot}deg)`,
               animation: phase === 'grow'
                 ? `flower-grow ${FLOWER_GROW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${cell.delay * FLOWER_GROW_STAGGER}ms both`
-                : `flower-fade ${FLOWER_FADE_MS}ms ease-out ${cell.delay * FLOWER_FADE_STAGGER}ms both`,
+                : `flower-out ${FLOWER_FADE_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${cell.delay * FLOWER_FADE_STAGGER}ms both`,
               willChange: 'transform, opacity',
             }}
           />

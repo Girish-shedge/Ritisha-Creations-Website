@@ -58,7 +58,7 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Circular back / share / WhatsApp; truncated white title (`galleryTitle`) **left-aligned** between back and actions
 - Share: **product photos only** (all gallery images; no favicon / brand `og-image`); copy + category URL. `og:image` meta stays the brand mark (not the cover photo)
 - Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
-- Nav: back / share / WhatsApp at **48×48**; icons **1.5px** stroke; WhatsApp uses home green gradient + icon; **12px** gap before WhatsApp; opens same category WhatsApp message as before
+- Nav: back / share / WhatsApp at **48×48**; icons **2px** stroke; WhatsApp uses **inline SVG** 8-lobe flower chrome (Figma 40:1378, spins ease-in-out) + upright WhatsApp glyph; **12px** gap before WhatsApp; opens same category WhatsApp message as before
 - Tap a photo → lightbox: centered infinite carousel (clones at both ends), black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×) with edge-clamped pan; **double-tap toggles ~2.5× ↔ 1×** (works while zoomed too); at 1× swipe L/R changes photo **and wraps**: last + swipe left → first slides in from the right; first + swipe right → last slides in from the left; swipe down or tap dimmed sides to close
 - **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **gradient stroke** (white → transparent on the rising bump); **soft static inner glow** after fill (no shimmer); **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; **not a WhatsApp link**; **explicit px height** (`max(72, colW/WAVE_AR)`)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
@@ -66,7 +66,9 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - After intro + **0.5s**, rotates the two footer lines
 - Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)`
 
-Navigation: marigold curtain (Figma 45:2005 / 45:2006) grows bottom→top over the current screen, swaps the page, then fades bottom→top with ease-out. Same both ways (home→gallery and back). Deep links skip it. Back → `/`.
+Navigation: marigold curtain (Figma 45:2005 / 45:2006, **1024px** PNGs in `src/assets/flowers/`). Same packed instances scale+fade **in** from the bottom, swap the page, then scale+fade **out** from the bottom (ease-out). Same both ways (home→gallery and back). Deep links skip it. Back → `/`.
+
+Future (not shipped): camera “try this design in your room” — see `docs/try-in-space.md`.
 
 ---
 
@@ -84,7 +86,7 @@ Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow)
 - `onDone` starts home header; `onGone` unmounts overlay.
 
 ### Home header — after shloka
-`introPhase`: `wait` → `trace` → `cards` (at **60%** of header chrome) → `done`. Does not replay when returning from gallery (`settleInstant`). Back-from-gallery scroll restore is **instant** (no ease); home ↔ gallery uses the flower curtain (not a 280ms fade).
+`introPhase`: `wait` → `trace` → `cards` (at **60%** of header chrome) → `done`. Does not replay when returning from gallery (`settleInstant`). Back-from-gallery scroll restore is **instant** (no ease); home ↔ gallery uses the flower curtain (scale+fade in, then scale+fade out).
 
 ### Gallery footer — each category open
 Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill → text via `useChromeIntro({ skipMarks: true })`. Explicit wave height (not aspect-ratio shell).
@@ -157,6 +159,7 @@ interface CategoryData {
 | `HomeScreen` / `GalleryScreen` | `App.tsx` | Screens |
 | `BlueHeader` / `GreenFooter` | `App.tsx` | Chrome + `useChromeIntro` |
 | `DriveImg` / cards / blur | `App.tsx` | Media + home cards |
+| `FlowerCurtain` | `App.tsx` | Home ↔ gallery marigold overlay |
 | `shareCategory` | `lib/share.ts` | Web Share — product photos only |
 
 Unused: `src/imports/**`, root `imports/**` (Figma exports — do not wire into the app).
