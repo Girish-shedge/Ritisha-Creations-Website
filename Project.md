@@ -42,7 +42,7 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 ## Screens
 
 ### Home
-- Sticky orange/brown wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`); **no** frosted blur; **gradient stroke** (white → transparent on the hanging bump, Figma 34:1373)
+- Sticky orange/brown wave header — “Rittisha Creations” + swastiks (stroke → fill → marks → text; once per load; survives gallery → home via `settleInstant`); **no** frosted blur; **gradient stroke** (white → transparent on the hanging bump, Figma 34:1373); **soft static inner glow** after fill (no shimmer)
 - Category cards — **1:1** corner-cut frame; horizontal scroller (autoplay after **≥0.5s** mostly in view); swipe changes photos; **tap photo frame** opens detail (always at Image 1); **no** “Open in gallery” CTA under cards
 - Loading photos: white **श्री** `placeholder.png` (same as gallery) — no peach/orange wash behind it
 - Title overlay: soft progressive blur (~**0→2.5**) + dark scrim, **clipped with `CARD_FRAME_MASK`** so blur/scrim follow the corner cuts (do not leave blur as a plain rectangle)
@@ -60,13 +60,13 @@ Deep links: `https://rittishacreations.vercel.app/{slug}`. SPA rewrite in `verce
 - Edge-to-edge **1:1** photos, **16px** gap; **no** top/bottom list padding (footer overlays the last photo)
 - Nav: back / share / WhatsApp at **48×48**; icons **1.5px** stroke; WhatsApp uses home green gradient + icon; **12px** gap before WhatsApp; opens same category WhatsApp message as before
 - Tap a photo → lightbox: centered infinite carousel (clones at both ends), black blurred backdrop; bounce ease-in-out on open/close; pinch zoom (max ~4×) with edge-clamped pan; **double-tap toggles ~2.5× ↔ 1×** (works while zoomed too); at 1× swipe L/R changes photo **and wraps**: last + swipe left → first slides in from the right; first + swipe right → last slides in from the left; swipe down or tap dimmed sides to close
-- **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **gradient stroke** (white → transparent on the rising bump); **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; **not a WhatsApp link**; **explicit px height** (`max(72, colW/WAVE_AR)`)
+- **Orange/brown footer** (Figma 35:1374) always present — stroke → fill → text; **gradient stroke** (white → transparent on the rising bump); **soft static inner glow** after fill (no shimmer); **no** frosted blur; solid fill; white rotating copy **Customization also available** ↔ **Prices starting from ₹499**; **not a WhatsApp link**; **explicit px height** (`max(72, colW/WAVE_AR)`)
 - App shell height tracks **`visualViewport`** (not bare `100vh`/`100svh`) so the footer is not trapped under browser chrome on phones where layout viewport ≠ visible viewport
 - Footer chrome intro **each open**: stroke → fill → text (no swastik “marks” step); fill **stays on** once shown (`fillOn = showFill || locked || settled` — same idea as BlueHeader)
 - After intro + **0.5s**, rotates the two footer lines
 - Footer stacks **above** the photo scroller via **`position: fixed`** to the visible viewport bottom (centered `max-w-[480px]`); wave only + `env(safe-area-inset-bottom)`
 
-Navigation: History API + **280ms** fade. Back → `/`.
+Navigation: marigold curtain (Figma 45:2005 / 45:2006) grows bottom→top over the current screen, swaps the page, then fades bottom→top with ease-out. Same both ways (home→gallery and back). Deep links skip it. Back → `/`.
 
 ---
 
@@ -84,7 +84,7 @@ Phases: **borders → plaque → Om → dividers → letter reveal (glow+shadow)
 - `onDone` starts home header; `onGone` unmounts overlay.
 
 ### Home header — after shloka
-`introPhase`: `wait` → `trace` → `cards` (at **60%** of header chrome) → `done`. Does not replay when returning from gallery (`settleInstant`). Back-from-gallery scroll restore is **instant** (no ease); keep the **280ms** home ↔ gallery fade.
+`introPhase`: `wait` → `trace` → `cards` (at **60%** of header chrome) → `done`. Does not replay when returning from gallery (`settleInstant`). Back-from-gallery scroll restore is **instant** (no ease); home ↔ gallery uses the flower curtain (not a 280ms fade).
 
 ### Gallery footer — each category open
 Always mounted; `key={category.id}` remounts for a fresh intro. Stroke → fill → text via `useChromeIntro({ skipMarks: true })`. Explicit wave height (not aspect-ratio shell).

@@ -17,6 +17,7 @@
  *   RotatingLines                 CTA / footer copy rotator
  *   DriveImg / Card* / PhotoLightbox  Photos, cards, gallery zoom viewer
  *   HomeScreen / GalleryScreen    Screens
+ *   FlowerCurtain                 Home ↔ gallery marigold overlay
  *   App (default export)          Root
  *
  * See Project.md for mobile do-not-regress (footer CTA, card blur cuts, shloka glow).
@@ -37,6 +38,8 @@ import iconBack from '@/assets/icons/chevron-left.svg'
 import iconShare from '@/assets/icons/share.svg'
 import iconSwastik from '@/assets/icons/swastik.svg'
 import waFlower from '@/assets/icons/wa-flower.png'
+import flowerYellow from '@/assets/flowers/flower-1.png'
+import flowerOrange from '@/assets/flowers/flower-2.png'
 
 const SLIDE_MS = 3500
 const SLIDE_EASE_MS = 700
@@ -302,6 +305,21 @@ function useChromeIntro(
   }
 }
 
+function chromeInnerGlow(id: string) {
+  return (
+    <filter id={id} x="-12%" y="-20%" width="124%" height="150%" colorInterpolationFilters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4.5" result="blur" />
+      <feComposite in="blur" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="inner" />
+      <feFlood floodColor="#FFD7A0" floodOpacity="0.72" />
+      <feComposite in2="inner" operator="in" result="glow" />
+      <feMerge>
+        <feMergeNode in="SourceGraphic" />
+        <feMergeNode in="glow" />
+      </feMerge>
+    </filter>
+  )
+}
+
 // ── Blue sticky header ────────────────────────────────────────
 function BlueHeader({
   label, scrolled: _scrolled, playIntro, onIntroComplete, settleInstant = false,
@@ -330,21 +348,23 @@ function BlueHeader({
     <div className="relative w-full h-full">
       <svg className="absolute inset-0 size-full"
         viewBox="0 0 393 87.3859" preserveAspectRatio="none" fill="none">
-        <path
-          d={HEADER}
-          fill="url(#blueHGrad)"
-          stroke="url(#blueHStroke)"
-          strokeWidth={2}
-          vectorEffect="non-scaling-stroke"
-          style={{
-            fillOpacity: fillOn ? 1 : 0,
-            strokeOpacity: fillOn ? 1 : 0,
-            transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out, stroke-opacity ${T_FILL_DUR}ms ease-in-out`,
-          }}
-        />
+          <path
+            d={HEADER}
+            fill="url(#blueHGrad)"
+            stroke="url(#blueHStroke)"
+            strokeWidth={2}
+            vectorEffect="non-scaling-stroke"
+            filter={fillOn ? 'url(#blueHGlow)' : undefined}
+            style={{
+              fillOpacity: fillOn ? 1 : 0,
+              strokeOpacity: fillOn ? 1 : 0,
+              transition: `fill-opacity ${T_FILL_DUR}ms ease-in-out, stroke-opacity ${T_FILL_DUR}ms ease-in-out`,
+            }}
+          />
         <path d={HEADER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
         <path d={HEADER_RIGHT} {...stroke} />
         <defs>
+          {chromeInnerGlow('blueHGlow')}
           <linearGradient id="blueHGrad" x1="196.5" y1="80.823" x2="196.5" y2="0" gradientUnits="userSpaceOnUse">
             <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
           </linearGradient>
@@ -542,6 +562,7 @@ function GreenFooter({
             stroke={`url(#${uid}_stroke)`}
             strokeWidth={2}
             vectorEffect="non-scaling-stroke"
+            filter={fillOn ? `url(#${uid}_glow)` : undefined}
             style={{
               fillOpacity: fillOn ? 1 : 0,
               strokeOpacity: fillOn ? 1 : 0,
@@ -551,6 +572,7 @@ function GreenFooter({
           <path d={FOOTER_LEFT} {...stroke} onTransitionEnd={onStrokeTransitionEnd} />
           <path d={FOOTER_RIGHT} {...stroke} />
           <defs>
+            {chromeInnerGlow(`${uid}_glow`)}
             <linearGradient id={`${uid}_grad`} x1="196.5" y1="6.563" x2="196.5" y2="87.386" gradientUnits="userSpaceOnUse">
               <stop stopColor={CHROME_ORANGE} /><stop offset="1" stopColor={CHROME_BROWN} />
             </linearGradient>
@@ -2171,11 +2193,114 @@ function pathSlug() {
   return raw
 }
 
+// ── Flower curtain (home ↔ gallery) ───────────────────────────
+type FlowerCell = {
+  x: number
+  y: number
+  rot: number
+  sc: number
+  kind: 0 | 1
+  delay: number
+  z: number
+}
+
+const FLOWER_SRC = [flowerYellow, flowerOrange] as const
+const FLOWER_GROW_MS = 520
+const FLOWER_GROW_STAGGER = 400
+const FLOWER_FADE_MS = 460
+const FLOWER_FADE_STAGGER = 320
+const FLOWER_GROW_TOTAL = FLOWER_GROW_MS + FLOWER_GROW_STAGGER
+const FLOWER_FADE_TOTAL = FLOWER_FADE_MS + FLOWER_FADE_STAGGER
+
+function flowerSizeFor(w: number) {
+  return Math.round(Math.min(210, Math.max(160, w * 0.46)))
+}
+
+function packFlowerWall(w: number, h: number, size: number): FlowerCell[] {
+  const colGap = size * 0.56
+  const rowGap = size * 0.5
+  const jitterX = size * 0.18
+  const jitterY = size * 0.14
+  // ponytail: worst-case jitter must still overlap; raise overlap (lower gap) if this trips.
+  if (colGap + jitterX >= size || rowGap + jitterY >= size) {
+    throw new Error('flower wall would leave gaps')
+  }
+  const cols = Math.ceil(w / colGap) + 2
+  const rows = Math.ceil(h / rowGap) + 2
+  const cells: FlowerCell[] = []
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const x = c * colGap - size * 0.4 + (Math.random() - 0.5) * jitterX
+      const y = r * rowGap - size * 0.4 + (Math.random() - 0.5) * jitterY
+      let kind = (c % 2) as 0 | 1
+      if (Math.random() < 0.22) kind = (1 - kind) as 0 | 1
+      const cy = y + size * 0.5
+      cells.push({
+        x,
+        y,
+        rot: (Math.random() - 0.5) * 28,
+        sc: 0.94 + Math.random() * 0.16,
+        kind,
+        delay: 1 - Math.min(1, Math.max(0, cy / h)),
+        z: rows - r,
+      })
+    }
+  }
+  return cells
+}
+
+function FlowerCurtain({
+  phase, cells, size, top, height,
+}: {
+  phase: 'grow' | 'fade'
+  cells: FlowerCell[]
+  size: number
+  top: number
+  height: number
+}) {
+  return (
+    <div
+      aria-hidden
+      className="fixed inset-x-0 z-[90] flex justify-center overflow-hidden"
+      style={{ top, height, pointerEvents: 'auto' }}
+    >
+      <div className="relative h-full w-full max-w-[480px] overflow-hidden">
+        {cells.map((cell, i) => (
+          <img
+            key={i}
+            src={FLOWER_SRC[cell.kind]}
+            alt=""
+            width={size}
+            height={size}
+            draggable={false}
+            className="pointer-events-none absolute max-w-none"
+            style={{
+              left: cell.x,
+              top: cell.y,
+              width: size,
+              height: size,
+              zIndex: cell.z,
+              ['--rot' as string]: `${cell.rot}deg`,
+              ['--sc' as string]: String(cell.sc),
+              transformOrigin: '50% 50%',
+              transform: `scale(${cell.sc}) rotate(${cell.rot}deg)`,
+              animation: phase === 'grow'
+                ? `flower-grow ${FLOWER_GROW_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${cell.delay * FLOWER_GROW_STAGGER}ms both`
+                : `flower-fade ${FLOWER_FADE_MS}ms ease-out ${cell.delay * FLOWER_FADE_STAGGER}ms both`,
+              willChange: 'transform, opacity',
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Root ──────────────────────────────────────────────────────
 export default function App() {
   const [selected, setSelected] = useState<CategoryData | null>(null)
-  const [visible,  setVisible]  = useState(true)
   const fontsReady = useFontsReady()
+  const shell = useVisualShell()
   const [categories, setCategories] = useState<CategoryData[]>(
     () => readCatalogueCache() ?? [],
   )
@@ -2236,35 +2361,73 @@ export default function App() {
     setBootDone(true)
   }, [])
 
-  const navigate = useCallback((cat: CategoryData | null) => {
-    setVisible(false)
-    setTimeout(() => {
-      if (cat) {
-        // Leaving home → keep scroll for back-from-gallery restore
-        setRestoreScrollTop(undefined)
-      } else {
-        setRestoreScrollTop(homeScrollTop.current)
-      }
-      setSelected(cat)
-      const path = cat ? categoryPath(cat.slug) : '/'
-      window.history.pushState({}, '', path)
-      setVisible(true)
-    }, 280)
+  const [curtain, setCurtain] = useState<{
+    phase: 'grow' | 'fade'
+    cells: FlowerCell[]
+    size: number
+  } | null>(null)
+  const playingRef = useRef(false)
+  const phaseRef = useRef<'off' | 'grow' | 'fade'>('off')
+  const pendingRef = useRef<{ cat: CategoryData | null; push: boolean } | null>(null)
+  const curtainTimers = useRef<number[]>([])
+
+  const applyNav = useCallback((cat: CategoryData | null, push: boolean) => {
+    if (cat) setRestoreScrollTop(undefined)
+    else setRestoreScrollTop(homeScrollTop.current)
+    setSelected(cat)
+    if (push) window.history.pushState({}, '', cat ? categoryPath(cat.slug) : '/')
   }, [])
+
+  const playCurtain = useCallback((cat: CategoryData | null, push: boolean) => {
+    if (playingRef.current) {
+      if (!push) {
+        pendingRef.current = { cat, push: false }
+        if (phaseRef.current === 'fade') applyNav(cat, false)
+      }
+      return
+    }
+    playingRef.current = true
+    pendingRef.current = { cat, push }
+    const size = flowerSizeFor(shell.width)
+    phaseRef.current = 'grow'
+    setCurtain({ phase: 'grow', cells: packFlowerWall(shell.width, shell.height, size), size })
+    const t1 = window.setTimeout(() => {
+      const next = pendingRef.current
+      pendingRef.current = null
+      if (next) applyNav(next.cat, next.push)
+      phaseRef.current = 'fade'
+      setCurtain((c) => (c ? { ...c, phase: 'fade' } : null))
+      const t2 = window.setTimeout(() => {
+        playingRef.current = false
+        phaseRef.current = 'off'
+        setCurtain(null)
+      }, FLOWER_FADE_TOTAL)
+      curtainTimers.current.push(t2)
+    }, FLOWER_GROW_TOTAL)
+    curtainTimers.current.push(t1)
+  }, [applyNav, shell.width, shell.height])
+
+  useEffect(() => () => {
+    for (const id of curtainTimers.current) window.clearTimeout(id)
+  }, [])
+
+  const navigate = useCallback((cat: CategoryData | null) => {
+    playCurtain(cat, true)
+  }, [playCurtain])
 
   useEffect(() => {
     const onPop = () => {
       const slug = pathSlug()
       if (!slug) {
-        setSelected(null)
+        playCurtain(null, false)
         return
       }
       const match = categories.find((c) => c.slug === slug)
-      setSelected(match ?? null)
+      playCurtain(match ?? null, false)
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [categories])
+  }, [categories, playCurtain])
 
   const contentReady = fontsReady && catalogueReady
   // Review mode: ?loop=1 keeps shloka replaying (no home handoff).
@@ -2272,7 +2435,6 @@ export default function App() {
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('loop'),
   )
   const showShloka = loopShloka || (!pathSlug() && !bootDone)
-  const shell = useVisualShell()
 
   return (
     <div
@@ -2291,12 +2453,7 @@ export default function App() {
         style={{ height: shell.height }}
       >
         {contentReady && !loopShloka && (
-          <div className="absolute inset-0"
-            style={{
-              opacity: visible ? 1 : 0,
-              transform: visible ? 'translateY(0)' : 'translateY(10px)',
-              transition: 'opacity 280ms ease-in-out, transform 280ms ease-in-out',
-            }}>
+          <div className="absolute inset-0">
             {selected
               ? <GalleryScreen
                   category={selected}
@@ -2319,6 +2476,15 @@ export default function App() {
             onDone={onShlokaDone}
             onGone={onShlokaGone}
             loop={loopShloka}
+          />
+        )}
+        {curtain && (
+          <FlowerCurtain
+            phase={curtain.phase}
+            cells={curtain.cells}
+            size={curtain.size}
+            top={shell.top}
+            height={shell.height}
           />
         )}
       </div>
